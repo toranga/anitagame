@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "1.5",
+  "versionCode": 7,
+  "versionName": "1.6",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "Title menu works with the Shield remote, and the right stick looks the right way."
+  "notes": "Pushing the left stick right moves the hero to the right of the screen."
 }
