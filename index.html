@@ -19,6 +19,10 @@
 <body>
 <div id="game"></div>
 <script>
+// The Android TV app loads this page with ?native=1 and sets window.__nativePad.
+// While that flag is set, pollGamepad() ignores navigator.getGamepads() so a
+// controller is never applied twice. The browser build never sets the flag.
+window.__nativePad = !!window.__nativePad || /(?:\?|&)native=1(?:&|$)/.test((location && location.search) || '');
 function DONTDIE(root, SPR, opts){
 "use strict";
 opts = opts || {};
@@ -228,15 +232,25 @@ function padButton(pad, i){
 }
 function pollGamepad(){
   let pad = null;
-  try {
-    const list = navigator.getGamepads ? navigator.getGamepads() : null;
-    if (list){
-      for (let i = 0; i < list.length; i++){
-        const g = list[i];
-        if (g && g.connected){ pad = g; break; }
+  if (window.__nativePad) {
+    // Native forwarding owns the controller. Do not also read the Gamepad API.
+    if (!AC || AC.state === 'suspended') audio();
+    pad = {
+      connected: true,
+      axes: [typeof window.__nativeAxis === 'number' ? window.__nativeAxis : 0],
+      buttons: window.__nativeButtons || []
+    };
+  } else {
+    try {
+      const list = navigator.getGamepads ? navigator.getGamepads() : null;
+      if (list){
+        for (let i = 0; i < list.length; i++){
+          const g = list[i];
+          if (g && g.connected){ pad = g; break; }
+        }
       }
-    }
-  } catch (e) {}
+    } catch (e) {}
+  }
   const now = !!pad;
   if (now && !padConnected && manualHide === null) autoHide = true;
   if (now !== padConnected){ padConnected = now; applyTouchChrome(); }
@@ -689,7 +703,8 @@ function drawTitle(){
   if (Math.floor(T*2) % 2 === 0){ ctx.font = 'bold 28px "Arial Black", Arial'; ctx.fillStyle = '#ffe35a'; ctx.strokeStyle = '#1a0630'; ctx.lineWidth = 6; ctx.strokeText(prompt, W/2, 208); ctx.fillText(prompt, W/2, 208); }
   roundRect(W/2 - 400, 222, 800, 128, 14); ctx.fillStyle = '#0a0a2acc'; ctx.fill();
   ctx.font = 'bold 15px Arial'; ctx.fillStyle = '#fff';
-  if (isTouch){ ctx.fillText('Left buttons: run     JUMP: jump     FLY: hold to fly', W/2, 246);
+  // The Android TV shell sets __nativePad and may still report a touch screen.
+  if (isTouch && !window.__nativePad){ ctx.fillText('Left buttons: run     JUMP: jump     FLY: hold to fly', W/2, 246);
     ctx.fillText('ZAP: laser     TALK: talk     II: pause     \u266B: sound     Buttons: H', W/2, 268); }
   else { ctx.fillText('Run: Arrows or A/D     Jump: Space or Up     Fly: hold F or Shift', W/2, 246);
     ctx.fillText('Laser: Z or J     Talk: X     Pause: P     Sound: M     Buttons: H', W/2, 268); }
@@ -734,7 +749,7 @@ function loop(now){
 }
 raf = requestAnimationFrame(loop);
 const refit = setInterval(fit, 1000); LISTENERS.push([{removeEventListener(){ clearInterval(refit); }}, 'x', null]);
-window.__game = { get blobs(){ return blobs; }, get state(){ return state; }, get player(){ return player; }, get boss(){ return boss; }, get bubbles(){ return bubbles; }, get diamonds(){ return diamonds; }, get lasers(){ return lasers; }, get paused(){ return paused; }, get muted(){ return muted; }, get padConnected(){ return padConnected; }, get buttonsHidden(){ return gameplayButtonsHidden(); }, get t(){ return T; }, npcs:()=>npcs, isTouch };
+window.__game = { get blobs(){ return blobs; }, get state(){ return state; }, get player(){ return player; }, get boss(){ return boss; }, get bubbles(){ return bubbles; }, get diamonds(){ return diamonds; }, get lasers(){ return lasers; }, get paused(){ return paused; }, get muted(){ return muted; }, get padConnected(){ return padConnected; }, get buttonsHidden(){ return gameplayButtonsHidden(); }, get t(){ return T; }, forcePause(){ if (state === 'play' && !paused) paused = true; }, npcs:()=>npcs, isTouch };
 return function stop(){ alive = false; cancelAnimationFrame(raf); for (const [t, ty, fn, o] of LISTENERS) t.removeEventListener(ty, fn, o); try { if (AC) AC.close(); } catch(e){} root.innerHTML = ''; };
 }
 

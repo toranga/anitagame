@@ -300,3 +300,57 @@ test('a saved choice overrides auto-hide, and a touch brings buttons back', asyn
   expect(hidden.errors).toEqual([]);
   await hidden.context.close();
 });
+
+test('native=1 ignores getGamepads and plays from the injected controller', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, baseURL: 'http://127.0.0.1:4173' });
+  await context.addInitScript(padMock(true));
+  const page = await context.newPage();
+  const errors = trackErrors(page);
+  await page.goto('/index.html?native=1');
+  await page.waitForFunction(() => window.__game && window.__nativePad === true && window.__game.state === 'title');
+
+  await page.evaluate(() => window.__pad.set(9, true));
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.__game.state)).toBe('title');
+  await page.evaluate(() => window.__pad.reset());
+
+  await page.evaluate(() => {
+    const buttons = [];
+    buttons[9] = { pressed: true, value: 1 };
+    window.__nativeButtons = buttons;
+    window.__nativeAxis = 0;
+  });
+  await page.waitForFunction(() => window.__game.state === 'play');
+  expect(await page.evaluate(() => window.__game.paused)).toBe(false);
+  await page.evaluate(() => { window.__nativeButtons[9] = { pressed: false, value: 0 }; });
+  await page.waitForTimeout(50);
+
+  const x0 = await page.evaluate(() => window.__game.player.x);
+  await page.evaluate(() => window.__pad.axis(1));
+  await page.waitForTimeout(250);
+  expect(Math.abs((await page.evaluate(() => window.__game.player.x)) - x0)).toBeLessThan(12);
+  await page.evaluate(() => window.__pad.axis(0));
+
+  await page.evaluate(() => { window.__nativeAxis = 0.9; });
+  await page.waitForFunction((start) => window.__game.player.x > start + 30, x0);
+  await page.evaluate(() => { window.__nativeAxis = 0; });
+
+  await page.waitForFunction(() => window.__game.player.onGround);
+  const y0 = await page.evaluate(() => window.__game.player.y);
+  await page.evaluate(() => { window.__nativeButtons[0] = { pressed: true, value: 1 }; });
+  await page.waitForFunction((y) => window.__game.player.y < y - 20, y0);
+  await page.evaluate(() => { window.__nativeButtons[0] = { pressed: false, value: 0 }; });
+
+  await page.waitForFunction(() => window.__game.player.cool <= 0);
+  await page.evaluate(() => { window.__nativeButtons[1] = { pressed: true, value: 1 }; });
+  await page.waitForFunction(() => window.__game.lasers.length > 0 || window.__game.player.cool > 0);
+  await page.evaluate(() => { window.__nativeButtons[1] = { pressed: false, value: 0 }; });
+
+  await page.evaluate(() => window.__game.forcePause());
+  expect(await page.evaluate(() => window.__game.paused)).toBe(true);
+  await page.evaluate(() => window.__game.forcePause());
+  expect(await page.evaluate(() => window.__game.paused)).toBe(true);
+
+  expect(errors).toEqual([]);
+  await context.close();
+});
