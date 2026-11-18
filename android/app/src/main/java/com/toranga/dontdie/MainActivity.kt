@@ -82,13 +82,36 @@ class MainActivity : Activity() {
             KeyEvent.ACTION_UP -> false
             else -> return if (GamepadMap.shouldConsume(event.keyCode)) true else super.dispatchKeyEvent(event)
         }
+        if (GamepadMap.isCenter(event.keyCode)) {
+            pad.onCenter(down)
+            if (down && event.repeatCount == 0) menuPress("confirm")
+            scheduleFlush()
+            return true
+        }
         if (!pad.onKey(event.keyCode, down)) return super.dispatchKeyEvent(event)
+        if (down && event.repeatCount == 0) {
+            when (event.keyCode) {
+                KeyEvent.KEYCODE_DPAD_UP -> menuPress("up")
+                KeyEvent.KEYCODE_DPAD_DOWN -> menuPress("down")
+                KeyEvent.KEYCODE_DPAD_LEFT -> menuPress("left")
+                KeyEvent.KEYCODE_DPAD_RIGHT -> menuPress("right")
+                KeyEvent.KEYCODE_BUTTON_A -> menuPress("confirm")
+                KeyEvent.KEYCODE_BUTTON_B -> menuPress("cancel")
+                KeyEvent.KEYCODE_BUTTON_START -> menuPress("start")
+            }
+        }
         scheduleFlush()
         return true
     }
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (!GamepadMap.isJoystick(event)) return super.dispatchGenericMotionEvent(event)
+        val right = StickAxes.rightStick(
+            event.getAxisValue(MotionEvent.AXIS_Z),
+            event.getAxisValue(MotionEvent.AXIS_RZ),
+            event.getAxisValue(MotionEvent.AXIS_RX),
+            event.getAxisValue(MotionEvent.AXIS_RY)
+        )
         pad.onAxes(
             event.getAxisValue(MotionEvent.AXIS_X),
             event.getAxisValue(MotionEvent.AXIS_HAT_X),
@@ -98,8 +121,8 @@ class MainActivity : Activity() {
                 event.getAxisValue(MotionEvent.AXIS_GAS)
             ),
             event.getAxisValue(MotionEvent.AXIS_Y),
-            stick(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX),
-            stick(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY),
+            right.first,
+            right.second,
             maxOf(
                 event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
                 event.getAxisValue(MotionEvent.AXIS_BRAKE)
@@ -126,6 +149,11 @@ class MainActivity : Activity() {
             )
         }
         Toast.makeText(this, "Press BACK again to quit", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun menuPress(name: String) {
+        if (!pageReady || !::webView.isInitialized) return
+        webView.evaluateJavascript("window.__menuPress&&window.__menuPress('" + name + "')", null)
     }
 
     private fun scheduleFlush() {
@@ -228,11 +256,6 @@ class MainActivity : Activity() {
     companion object {
         private const val GAME_URL = "https://appassets.androidplatform.net/assets/launcher.html?native=1"
 
-        private fun stick(event: MotionEvent, primary: Int, secondary: Int): Float {
-            val a = event.getAxisValue(primary)
-            val b = event.getAxisValue(secondary)
-            return if (kotlin.math.abs(a) >= kotlin.math.abs(b)) a else b
-        }
         private const val CURSOR_CSS =
             "(function(){var s=document.createElement('style');s.textContent='html,body,canvas,button,div{cursor:none !important}';document.head.appendChild(s);})();"
     }

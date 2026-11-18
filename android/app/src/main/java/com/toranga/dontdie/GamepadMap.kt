@@ -26,6 +26,12 @@ object GamepadMap {
     const val DPAD_LEFT = 14
     const val DPAD_RIGHT = 15
 
+    fun isCenter(keyCode: Int): Boolean {
+        return keyCode == KeyEvent.KEYCODE_DPAD_CENTER ||
+            keyCode == KeyEvent.KEYCODE_ENTER ||
+            keyCode == KeyEvent.KEYCODE_NUMPAD_ENTER
+    }
+
     fun isBack(keyCode: Int): Boolean {
         return keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE
     }
@@ -41,10 +47,7 @@ object GamepadMap {
         KeyEvent.KEYCODE_BUTTON_R2 -> R2
         KeyEvent.KEYCODE_BUTTON_THUMBL -> L3
         KeyEvent.KEYCODE_BUTTON_THUMBR -> R3
-        KeyEvent.KEYCODE_BUTTON_START,
-        KeyEvent.KEYCODE_DPAD_CENTER,
-        KeyEvent.KEYCODE_ENTER,
-        KeyEvent.KEYCODE_NUMPAD_ENTER -> START
+        KeyEvent.KEYCODE_BUTTON_START -> START
         KeyEvent.KEYCODE_BUTTON_SELECT -> SELECT
         KeyEvent.KEYCODE_DPAD_LEFT -> DPAD_LEFT
         KeyEvent.KEYCODE_DPAD_RIGHT -> DPAD_RIGHT

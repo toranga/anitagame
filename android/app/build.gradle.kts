@@ -19,8 +19,8 @@ android {
         applicationId = "com.toranga.dontdie"
         minSdk = 21
         targetSdk = 36
-        versionCode = versionCodeOverride ?: 5
-        versionName = "1.4"
+        versionCode = versionCodeOverride ?: 6
+        versionName = "1.5"
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
     }
 
@@ -55,6 +55,7 @@ val gameAssets = layout.buildDirectory.dir("generated/gameassets")
 
 val copyGameAsset = tasks.register<Copy>("copyGameAsset") {
     from(rootProject.layout.projectDirectory.file("../index.html"))
+    from(rootProject.layout.projectDirectory.file("../menu-input.js"))
     into(gameAssets)
 }
 
