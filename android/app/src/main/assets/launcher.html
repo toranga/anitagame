@@ -19,11 +19,12 @@
 <button id="b0" type="button">DON'T DIE</button>
 <button id="b1" type="button">SPOOKY FOREST</button>
 <button id="b2" type="button">Check for updates</button>
+<button id="b3" type="button">Quit</button>
 <script>
 if (/(?:\?|&)native=1(?:&|$)/.test(location.search || "")) window.__nativePad = true;
-const games = ["index.html?native=1", "forest/index.html?native=1", "update"];
+const games = ["index.html?native=1", "forest/index.html?native=1", "update", "quit"];
 let sel = 0;
-const buttons = [document.getElementById("b0"), document.getElementById("b1"), document.getElementById("b2")];
+const buttons = [document.getElementById("b0"), document.getElementById("b1"), document.getElementById("b2"), document.getElementById("b3")];
 const prev = {};
 function paint() { buttons.forEach((b, i) => b.classList.toggle("on", i === sel)); }
 function go() {
@@ -31,11 +32,13 @@ function go() {
     if (window.AndroidUpdates && AndroidUpdates.check) AndroidUpdates.check();
     return;
   }
+  if (games[sel] === "quit") {
+    if (window.AnitaApp && AnitaApp.quit) AnitaApp.quit();
+    return;
+  }
   location.href = games[sel];
 }
-buttons[0].onclick = () => { sel = 0; go(); };
-buttons[1].onclick = () => { sel = 1; go(); };
-buttons[2].onclick = () => { sel = 2; go(); };
+buttons.forEach((b, i) => { b.onclick = () => { sel = i; go(); }; });
 function edge(i, down) {
   const was = !!prev[i];
   prev[i] = down;

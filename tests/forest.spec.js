@@ -265,14 +265,116 @@ test('lasso swing and right-stick camera orbit', async ({ browser }) => {
   await page.waitForFunction((n) => window.__game.collected > n, before);
 
   const yaw0 = await page.evaluate(() => window.__game.cameraYaw);
-  await page.evaluate(() => window.__pad.look(0.95, 0.2));
-  await page.waitForFunction((y) => Math.abs(window.__game.cameraYaw - y) > 0.35, yaw0);
+  await page.evaluate(() => window.__pad.look(0.95, -0.8));
+  await page.waitForFunction((y) => window.__game.cameraYaw > y + 0.35, yaw0);
   await page.waitForTimeout(180);
   await page.screenshot({ path: path.join(ARTIFACTS, 'forest-camera.png') });
-  const swung = await page.evaluate(() => window.__game.orbitYaw);
-  expect(Math.abs(swung)).toBeGreaterThan(0.2);
+  const held = await page.evaluate(() => window.__game.cameraYaw);
   await page.evaluate(() => window.__pad.look(0, 0));
-  await page.waitForFunction(() => Math.abs(window.__game.orbitYaw) < 0.12, { timeout: 4000 });
+  await page.waitForTimeout(700);
+  const stayed = await page.evaluate(() => window.__game.cameraYaw);
+  expect(Math.abs(stayed - held)).toBeLessThan(0.08);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('stick up walks forward, stick right walks right, and a small push is slow', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, baseURL: 'http://127.0.0.1:4173' });
+  await context.addInitScript(() => {
+    const blank = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+    const state = { buttons: blank(), axes: [0, 0, 0, 0] };
+    window.__pad = {
+      axis(x, y) { state.axes[0] = x; state.axes[1] = y; },
+      native(x, y) {
+        window.__nativePad = true;
+        window.__nativeAxis = x;
+        window.__nativeAxisY = y;
+        window.__nativeRightX = 0;
+        window.__nativeRightY = 0;
+        window.__nativeButtons = blank();
+      },
+    };
+    navigator.getGamepads = () => [{
+      id: 'Mock Pad', index: 0, connected: true, mapping: 'standard',
+      axes: state.axes.slice(),
+      buttons: state.buttons.map((b) => ({ pressed: b.pressed, value: b.value, touched: false })),
+      timestamp: Date.now(),
+    }];
+  });
+  const page = await context.newPage();
+  const errors = track(page);
+  await page.goto('/forest/index.html');
+  await page.waitForFunction(() => window.__game && window.__game.state === 'title');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__game.state === 'play');
+
+  async function drift(axisX, axisY, ms) {
+    const start = await page.evaluate(() => ({ x: window.__game.player.x, z: window.__game.player.z }));
+    await page.evaluate(([x, y]) => window.__pad.axis(x, y), [axisX, axisY]);
+    await page.waitForTimeout(ms);
+    await page.evaluate(() => window.__pad.axis(0, 0));
+    await page.waitForTimeout(250);
+    const end = await page.evaluate(() => ({ x: window.__game.player.x, z: window.__game.player.z }));
+    return { dx: end.x - start.x, dz: end.z - start.z };
+  }
+
+  await page.evaluate(() => { window.__game.cameraYaw = 0; window.__game.player.x = 0; window.__game.player.z = 20; });
+  const forward = await drift(0, -0.95, 600);
+  expect(forward.dz).toBeGreaterThan(1);
+  expect(Math.abs(forward.dx)).toBeLessThan(Math.abs(forward.dz) * 0.45);
+
+  await page.evaluate(() => { window.__game.cameraYaw = 0; window.__game.player.x = 0; window.__game.player.z = 20; });
+  const right = await drift(0.95, 0, 600);
+  expect(right.dx).toBeGreaterThan(1);
+  expect(Math.abs(right.dz)).toBeLessThan(Math.abs(right.dx) * 0.45);
+
+  await page.evaluate(() => { window.__game.cameraYaw = 0; window.__game.player.x = 0; window.__game.player.z = 30; });
+  const tiny = await drift(0, -0.32, 500);
+  const full = await drift(0, -0.95, 500);
+  expect(full.dz).toBeGreaterThan(0.8);
+  expect(tiny.dz).toBeGreaterThan(0);
+  expect(tiny.dz).toBeLessThan(full.dz * 0.35);
+
+  await page.evaluate(() => { window.__game.cameraYaw = 0; window.__game.player.x = 0; window.__game.player.z = 40; });
+  const start = await page.evaluate(() => ({ x: window.__game.player.x, z: window.__game.player.z }));
+  await page.evaluate(() => window.__pad.native(0, -0.95));
+  await page.waitForTimeout(600);
+  await page.evaluate(() => window.__pad.native(0, 0));
+  await page.waitForTimeout(200);
+  const end = await page.evaluate(() => ({ x: window.__game.player.x, z: window.__game.player.z }));
+  expect(end.z - start.z).toBeGreaterThan(1);
+  expect(Math.abs(end.x - start.x)).toBeLessThan(Math.abs(end.z - start.z) * 0.45);
+
+  await page.evaluate(() => window.__game.togglePadDebug());
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-pad-debug.png') });
+  expect(await page.evaluate(() => window.__game.padDebugOn)).toBe(true);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('pause menu can resume and lists quit only inside the app', async ({ browser }) => {
+  const { context, page, errors } = await openForest(browser);
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__game.state === 'play');
+  await page.keyboard.press('p');
+  await page.waitForFunction(() => window.__game.state === 'pause');
+  let labels = await page.locator('#opts button').allTextContents();
+  expect(labels).toEqual(['Resume', 'Restart', 'Options', 'Back to game menu']);
+  await page.locator('#opts button', { hasText: 'Resume' }).click();
+  await page.waitForFunction(() => window.__game.state === 'play');
+  await page.evaluate(() => { window.AnitaApp = { quit() { window.__quit = 1; } }; });
+  await page.keyboard.press('p');
+  await page.waitForFunction(() => window.__game.state === 'pause');
+  labels = await page.locator('#opts button').allTextContents();
+  expect(labels[labels.length - 1]).toBe('Quit app');
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-pause-menu.png') });
+  await page.keyboard.press('ArrowDown');
+  await page.waitForFunction(() => document.querySelector('#opts .focus').textContent.includes('Restart'));
+  await page.keyboard.press('ArrowDown');
+  await page.waitForFunction(() => document.querySelector('#opts .focus').textContent === 'Options');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#opts button').first()).toHaveText(/Stick sensitivity/);
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-pause-options.png') });
   expect(errors).toEqual([]);
   await context.close();
 });

@@ -43,6 +43,7 @@
   #portrait{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;text-align:center;background:#071018;color:#ffe08a;font:800 24px Arial;padding:20px}
   #boot-error{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;color:#fff;background:#300;padding:24px;font:16px monospace}
   #speech{position:fixed;z-index:20;display:none;max-width:min(280px,68vw);background:#fff;color:#2a1030;padding:10px 14px;border-radius:16px;font:700 16px/1.3 Arial,sans-serif;text-align:center;transform:translate(-50%,-120%);pointer-events:none;box-shadow:0 6px 16px #0006}
+  #pad-debug{position:fixed;left:12px;bottom:12px;z-index:30;display:none;max-width:460px;padding:10px 12px;border-radius:12px;background:#000c;color:#b6ff9a;font:13px/1.35 ui-monospace,monospace;white-space:pre;pointer-events:none}
 </style>
 </head>
 <body>
@@ -76,6 +77,7 @@
 </div>
 <div id="portrait">Turn your phone sideways<br><small>SPOOKY FOREST plays in landscape</small></div>
 <div id="speech"></div>
+<div id="pad-debug"></div>
 <div id="boot-error"></div>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js" } }
@@ -386,7 +388,7 @@ const KEYMAP = {
   ArrowLeft: "left", KeyA: "left", ArrowRight: "right", KeyD: "right",
   ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down",
   ShiftLeft: "sprint", ShiftRight: "sprint",
-  Space: "act", KeyE: "act", KeyX: "act",
+  Space: "jump", KeyE: "act", KeyX: "act",
   KeyF: "lasso",
   KeyV: "fp", KeyP: "pause", KeyM: "mute", KeyH: "hidetoggle",
   Enter: "enter", NumpadEnter: "enter",
@@ -408,50 +410,85 @@ function padBtn(pad, i) {
   const b = pad && pad.buttons && pad.buttons[i];
   return !!(b && (b.pressed || b.value > 0.5));
 }
+function axisNum(v) {
+  const n = +v;
+  return Number.isFinite(n) ? n : 0;
+}
 function pollPad() {
   let pad = null;
+  let path = "none";
   if (window.__nativePad) {
+    path = "native";
     pad = {
       connected: true,
       axes: [
-        +window.__nativeAxis || 0,
-        +window.__nativeAxisY || 0,
-        +window.__nativeRightX || 0,
-        +window.__nativeRightY || 0,
+        axisNum(window.__nativeAxis),
+        axisNum(window.__nativeAxisY),
+        axisNum(window.__nativeRightX),
+        axisNum(window.__nativeRightY),
       ],
       buttons: window.__nativeButtons || [],
     };
   } else if (navigator.getGamepads) {
     const list = navigator.getGamepads();
-    for (let i = 0; i < list.length; i++) if (list[i] && list[i].connected) { pad = list[i]; break; }
+    for (let i = 0; i < list.length; i++) if (list[i] && list[i].connected) { pad = list[i]; path = "gamepad"; break; }
   }
   const ax = pad && pad.axes ? pad.axes : [];
-  const move = radial(ax[0] || 0, ax[1] || 0, 0.15);
-  const look = radial(ax[2] || 0, ax[3] || 0, 0.15);
+  const move = curveStick(ax[0] || 0, ax[1] || 0, 0.2);
+  const look = curveStick(ax[2] || 0, ax[3] || 0, 0.2);
   stickTarget.x = move.x;
   stickTarget.y = move.y;
   lookTarget.x = look.x;
   lookTarget.y = look.y;
+  padRaw.lx = ax[0] || 0;
+  padRaw.ly = ax[1] || 0;
+  padRaw.rx = ax[2] || 0;
+  padRaw.ry = ax[3] || 0;
+  padRaw.hatX = axisNum(window.__nativeHatX);
+  padRaw.hatY = axisNum(window.__nativeHatY);
+  padRaw.l2 = axisNum(window.__nativeL2);
+  padRaw.r2 = axisNum(window.__nativeR2);
+  padRaw.path = path;
+  const playing = state === "play";
   setHeld("pad", "left", !!(pad && padBtn(pad, 14)));
   setHeld("pad", "right", !!(pad && padBtn(pad, 15)));
   setHeld("pad", "up", !!(pad && padBtn(pad, 12)));
   setHeld("pad", "down", !!(pad && padBtn(pad, 13)));
-  setHeld("pad", "act", !!(pad && padBtn(pad, 0)));
-  setHeld("pad", "lasso", !!(pad && (padBtn(pad, 2) || padBtn(pad, 5))));
-  setHeld("pad", "sprint", !!(pad && (padBtn(pad, 1) || padBtn(pad, 7) || (+window.__nativeR2 || 0) > 0.55)));
+  setHeld("pad", "jump", !!(pad && playing && padBtn(pad, 0)));
+  setHeld("pad", "confirm", !!(pad && state === "pause" && padBtn(pad, 0)));
+  setHeld("pad", "act", !!(pad && padBtn(pad, 2)));
+  setHeld("pad", "lasso", !!(pad && state !== "pause" && (padBtn(pad, 1) || padBtn(pad, 5))));
+  setHeld("pad", "backmenu", !!(pad && state === "pause" && padBtn(pad, 1)));
+  setHeld("pad", "sprint", !!(pad && (padBtn(pad, 6) || padBtn(pad, 10) || padRaw.l2 > 0.55)));
   setHeld("pad", "fp", !!(pad && padBtn(pad, 3)));
-  setHeld("pad", "enter", !!(pad && (padBtn(pad, 9) || padBtn(pad, 0))));
+  setHeld("pad", "enter", !!(pad && (padBtn(pad, 9) || (!playing && state !== "pause" && padBtn(pad, 0)))));
   setHeld("pad", "pause", !!(pad && padBtn(pad, 9)));
-  setHeld("pad", "hidetoggle", !!(pad && padBtn(pad, 8)));
   setHeld("pad", "recenter", !!(pad && padBtn(pad, 11)));
+  const select = !!(pad && padBtn(pad, 8));
+  if (select) {
+    if (!selectDownAt) selectDownAt = performance.now();
+    if (!selectFired && performance.now() - selectDownAt >= 2000) {
+      debugOn = !debugOn;
+      selectFired = true;
+      try { localStorage.setItem(LS_DEBUG, debugOn ? "1" : "0"); } catch (e) {}
+    }
+  } else {
+    if (selectDownAt && !selectFired && performance.now() - selectDownAt < 2000) {
+      setHeld("pad", "hidetoggle", true);
+      setHeld("pad", "hidetoggle", false);
+    }
+    selectDownAt = 0;
+    selectFired = false;
+  }
   padConnected = !!pad;
 }
 
-function radial(x, y, dead) {
+function curveStick(x, y, dead) {
   const m = Math.hypot(x, y);
-  if (m <= dead || m === 0) return { x: 0, y: 0 };
-  const scaled = Math.pow((m - dead) / (1 - dead), 1.35);
-  return { x: (x / m) * scaled, y: (y / m) * scaled };
+  if (m <= dead || m === 0) return { x: 0, y: 0, m: 0 };
+  const n = Math.min(1, (m - dead) / (1 - dead));
+  const c = Math.pow(n, 1.5);
+  return { x: (x / m) * c, y: (y / m) * c, m: c };
 }
 
 let AC = null, muted = false, wind = null;
@@ -1014,10 +1051,10 @@ let lastLantern = { x: player.x, z: player.z };
 let hiding = false;
 let stamina = 1;
 let cameraYaw = 0;
-let cameraPitch = 0.22;
+let cameraPitch = 0;
 let heroYaw = 0;
-let orbitYaw = 0;
-let orbitPitch = 0.22;
+let camYaw = 0;
+let camPitch = 0;
 let lookIdle = 0;
 let fp = false;
 let cycleT = 8;
@@ -1052,9 +1089,12 @@ let fpsFrames = 0;
 let fpsAcc = 0;
 let lookDX = 0, lookDY = 0;
 const stickTarget = { x: 0, y: 0 };
-const stickSm = { x: 0, y: 0 };
 const lookTarget = { x: 0, y: 0 };
-const lookSm = { x: 0, y: 0 };
+const vel = { x: 0, z: 0 };
+const padRaw = { path: "none", lx: 0, ly: 0, rx: 0, ry: 0, hatX: 0, hatY: 0, l2: 0, r2: 0 };
+let selectDownAt = 0;
+let selectFired = false;
+let debugOn = false;
 let lassoT = 0;
 let lassoCd = 0;
 let stunT = 0;
@@ -1067,6 +1107,15 @@ const isTouch = ("ontouchstart" in window) || navigator.maxTouchPoints > 0;
 const LS_HIDE = "spooky-hide-buttons";
 const LS_SCARE = "spooky-jumpscares";
 const LS_START = "spooky-start";
+const LS_SENS = "spooky-sens";
+const LS_INVERT = "spooky-invert-y";
+const LS_FOLLOW = "spooky-follow";
+const LS_DEBUG = "spooky-pad-debug";
+let stickSens = "med";
+let invertY = false;
+let camFollow = false;
+let pausePage = "main";
+let menuStick = 0;
 let manualHide = null;
 try {
   const h = localStorage.getItem(LS_HIDE);
@@ -1076,6 +1125,11 @@ try {
   if (j === "mild" || j === "scary") jumpscareMode = j;
   const s = localStorage.getItem(LS_START);
   if (s === "night" || s === "day") startAt = s;
+  const sens = localStorage.getItem(LS_SENS);
+  if (sens === "low" || sens === "med" || sens === "high") stickSens = sens;
+  invertY = localStorage.getItem(LS_INVERT) === "1";
+  camFollow = localStorage.getItem(LS_FOLLOW) === "1";
+  debugOn = localStorage.getItem(LS_DEBUG) === "1";
 } catch (e) {}
 if (startAt === "night") cycleT = DAY + DUSK + 5;
 
@@ -1394,8 +1448,10 @@ function startGame() {
   surprises = 0;
   lastSurprise = -999;
   heroYaw = cameraYaw;
-  orbitYaw = 0;
-  orbitPitch = 0.22;
+  camYaw = cameraYaw;
+  camPitch = 0;
+  vel.x = 0;
+  vel.z = 0;
   lassoT = 0;
   lassoCd = 0;
   stunT = 0;
@@ -1417,7 +1473,7 @@ function startGame() {
   transformed = startAt === "night";
   topname.style.display = "none";
   showPanel(false);
-  hint("Lasso: F, click, RB, or X", 3600);
+  hint("A jumps. X acts. B or RB lassos. LT sprints.", 3600);
 }
 let doorAngle = 0;
 
@@ -1495,6 +1551,20 @@ function triggerSurprise() {
   beginScare("surprise");
 }
 
+function paintPadDebug() {
+  const el = document.getElementById("pad-debug");
+  if (!el) return;
+  el.style.display = debugOn ? "block" : "none";
+  if (!debugOn) return;
+  const f = (n) => (Number.isFinite(n) ? n : 0).toFixed(3);
+  el.textContent = [
+    "path " + padRaw.path + "   hold Select 2s to hide",
+    "raw L " + f(padRaw.lx) + " " + f(padRaw.ly) + "   R " + f(padRaw.rx) + " " + f(padRaw.ry),
+    "hat " + f(padRaw.hatX) + " " + f(padRaw.hatY) + "   L2 " + f(padRaw.l2) + " R2 " + f(padRaw.r2),
+    "curved L " + f(stickTarget.x) + " " + f(stickTarget.y) + "   R " + f(lookTarget.x) + " " + f(lookTarget.y),
+    "up is negative Y and walks forward. right is positive X.",
+  ].join("\n");
+}
 function hint(text, ms) {
   hintEl.style.display = "block";
   hintEl.textContent = text;
@@ -1509,27 +1579,29 @@ function dampAngle(a, b, dt, rate) {
   while (d < -Math.PI) d += Math.PI * 2;
   return a + d * (1 - Math.exp(-rate * dt));
 }
-function updateOrbit(dt) {
-  lookSm.x = damp(lookSm.x, lookTarget.x, dt, 18);
-  lookSm.y = damp(lookSm.y, lookTarget.y, dt, 18);
-  const looking = Math.hypot(lookTarget.x, lookTarget.y) > 0.04 || Math.abs(lookDX) + Math.abs(lookDY) > 0.4;
+function sensMul() {
+  return stickSens === "low" ? 0.7 : stickSens === "high" ? 1.35 : 1;
+}
+function updateCamera(dt, moving) {
+  const looking = Math.hypot(lookTarget.x, lookTarget.y) > 0.02 || Math.abs(lookDX) + Math.abs(lookDY) > 0.4;
   if (looking) lookIdle = 0;
   else lookIdle += dt;
-  orbitYaw -= lookSm.x * dt * 3.2;
-  orbitYaw -= lookDX * 0.006;
-  orbitPitch = clamp(orbitPitch - lookSm.y * dt * 1.7 + lookDY * 0.0035, -0.15, 0.8);
+  const mul = sensMul();
+  const ySign = invertY ? -1 : 1;
+  camYaw += lookTarget.x * 3 * mul * dt;
+  camYaw += lookDX * 0.005;
+  camPitch = clamp(camPitch - lookTarget.y * ySign * 2 * mul * dt - lookDY * 0.003, -0.85, 0.7);
   lookDX = 0;
   lookDY = 0;
   if (pressed.recenter) {
-    orbitYaw = 0;
-    orbitPitch = 0.22;
-    lookIdle = 3;
+    camYaw = heroYaw;
+    camPitch = 0;
+    lookIdle = 0;
+  } else if (camFollow && moving && lookIdle > 2) {
+    camYaw = dampAngle(camYaw, heroYaw, dt, 1.2);
   }
-  if (!looking && lookIdle > 0.6) {
-    const k = 1 - Math.exp(-dt * 3.4);
-    orbitYaw *= 1 - k;
-    orbitPitch += (0.22 - orbitPitch) * k;
-  }
+  cameraYaw = camYaw;
+  cameraPitch = camPitch;
 }
 function tryLasso() {
   if (state !== "play" || lassoCd > 0 || lassoT > 0) return;
@@ -1601,7 +1673,7 @@ function showPanel(on) {
 }
 
 function refreshPanel() {
-  const optsOn = state === "title";
+  const optsOn = state === "title" || state === "pause";
   opts.style.display = optsOn ? "flex" : "none";
   help.style.display = optsOn ? "block" : "none";
   document.getElementById("hud").style.display = state === "title" ? "none" : "block";
@@ -1609,13 +1681,15 @@ function refreshPanel() {
   if (state === "title") {
     heading.textContent = "";
     blurb.textContent = "You are the Hero, lost in the woods. Collect 7 lanterns and reach the gate. The monster is friendly by day.";
-    help.innerHTML = "Move with the left stick, D-pad, or WASD. The right stick looks around; it eases back behind you, and R3 recenters. Sprint is Shift or B. Swing the lasso with F, a left click, RB, or X. Hide, talk, or pick up with E, Space, or A. First person: V or Y.";
+    help.innerHTML = CONTROLS_HELP;
     prompt.textContent = isTouch ? "Tap to start" : "Press ENTER or A";
     drawOpts();
   } else if (state === "pause") {
     heading.textContent = "PAUSED";
-    blurb.textContent = "The forest waits.";
-    prompt.textContent = "Press P or START";
+    blurb.textContent = pausePage === "options" ? "Options" : "D-pad or stick. A chooses. B closes.";
+    help.innerHTML = CONTROLS_HELP;
+    prompt.textContent = "B closes this menu";
+    drawOpts();
   } else if (state === "win") {
     heading.textContent = "YOU ESCAPED THE FOREST!";
     blurb.textContent = "All 7 lanterns lit the way. The Hero made it out.";
@@ -1626,15 +1700,44 @@ function refreshPanel() {
     prompt.textContent = "Press ENTER to try again";
   }
 }
+const CONTROLS_HELP = "Left stick or D-pad moves. Right stick looks, and R3 recenters. A jumps. X hides, talks, or picks up. B or RB swings the lasso. LT or L3 sprints. Y is first person. Start pauses. Hold Select for the stick readout.";
+function canQuitApp() { return !!(window.AnitaApp && window.AnitaApp.quit); }
+function backToPicker() {
+  if (window.__nativePad || canQuitApp()) {
+    location.href = (/\/forest\//.test(location.pathname) ? "../" : "") + "launcher.html?native=1";
+    return;
+  }
+  if (/\/forest\//.test(location.pathname)) location.href = "../index.html";
+}
+function resumeGame() { state = "play"; showPanel(false); }
+function pauseActions() {
+  const items = [
+    ["Resume", resumeGame],
+    ["Restart", () => { resumeGame(); startGame(); }],
+    ["Options", () => { pausePage = "options"; menuRow = 0; drawOpts(); }],
+    ["Back to game menu", backToPicker],
+  ];
+  if (canQuitApp()) items.push(["Quit app", () => window.AnitaApp.quit()]);
+  return items;
+}
+function optionActions() {
+  const order = ["low", "med", "high"];
+  return [
+    ["Stick sensitivity: " + stickSens.toUpperCase(), () => { stickSens = order[(order.indexOf(stickSens) + 1) % 3]; save(LS_SENS, stickSens); drawOpts(); }],
+    ["Invert camera Y: " + (invertY ? "ON" : "OFF"), () => { invertY = !invertY; save(LS_INVERT, invertY ? "1" : "0"); drawOpts(); }],
+    ["Camera follow: " + (camFollow ? "ON" : "OFF"), () => { camFollow = !camFollow; save(LS_FOLLOW, camFollow ? "1" : "0"); drawOpts(); }],
+  ];
+}
 function drawOpts() {
   opts.innerHTML = "";
-  const items = [
+  const items = state === "pause" ? (pausePage === "options" ? optionActions() : pauseActions()) : [
     ["Jumpscares: " + (jumpscareMode === "mild" ? "MILD" : "SCARY"), () => { jumpscareMode = jumpscareMode === "mild" ? "scary" : "mild"; save(LS_SCARE, jumpscareMode); drawOpts(); }],
     ["Start at: " + (startAt === "night" ? "NIGHT" : "DAY"), () => { startAt = startAt === "night" ? "day" : "night"; save(LS_START, startAt); drawOpts(); }],
   ];
   items.forEach((it, i) => {
     const b = document.createElement("button");
     b.type = "button";
+    b.tabIndex = -1;
     b.className = "opt" + (i === menuRow ? " focus" : "") + " on";
     b.textContent = it[0];
     b.addEventListener("click", (e) => { e.stopPropagation(); audio(); menuRow = i; it[1](); });
@@ -1646,13 +1749,40 @@ panel.addEventListener("click", () => {
 });
 
 function menuInput() {
+  const count = 2;
   if (pressed.left || pressed.right) {
     if (menuRow === 0) { jumpscareMode = jumpscareMode === "mild" ? "scary" : "mild"; save(LS_SCARE, jumpscareMode); }
     else { startAt = startAt === "night" ? "day" : "night"; save(LS_START, startAt); }
     drawOpts();
   }
-  if (pressed.up || pressed.down) { menuRow = menuRow === 0 ? 1 : 0; drawOpts(); }
+  if (pressed.up || pressed.down) { menuRow = (menuRow + (pressed.down ? 1 : count - 1)) % count; drawOpts(); }
   if (pressed.enter) startGame();
+}
+function stickMenuDir() {
+  const y = stickTarget.y;
+  let dir = 0;
+  if (y < -0.45) dir = -1;
+  else if (y > 0.45) dir = 1;
+  if (dir === 0) { menuStick = 0; return 0; }
+  if (menuStick === dir) return 0;
+  menuStick = dir;
+  return dir;
+}
+function pauseInput() {
+  const items = pausePage === "options" ? optionActions() : pauseActions();
+  const count = items.length;
+  if (menuRow >= count) menuRow = 0;
+  let dir = (pressed.down ? 1 : 0) - (pressed.up ? 1 : 0);
+  if (!dir) dir = stickMenuDir();
+  if (dir) { menuRow = (menuRow + dir + count) % count; drawOpts(); }
+  if (pressed.backmenu) {
+    if (pausePage === "options") { pausePage = "main"; menuRow = 2; drawOpts(); }
+    else resumeGame();
+    return;
+  }
+  if (pressed.confirm || pressed.enter || pressed.left || pressed.right) {
+    if (pausePage === "options" || pressed.confirm || pressed.enter) items[menuRow][1]();
+  }
 }
 
 function updatePlay(dt) {
@@ -1660,7 +1790,11 @@ function updatePlay(dt) {
   invuln = Math.max(0, invuln - dt);
   const hostile = nightFactor > 0.55;
   if (pressed.fp) fp = !fp;
-  if (pressed.pause) { state = "pause"; showPanel(true); refreshPanel(); return; }
+  if (pressed.pause) { state = "pause"; pausePage = "main"; menuRow = 0; showPanel(true); refreshPanel(); return; }
+  if (pressed.jump && player.hop <= 0 && !hiding) {
+    player.hop = 0.72;
+    tone(480, 0.07, "square", 0.04, 220);
+  }
   if (pressed.act) interact();
   if (pressed.lasso) tryLasso();
   lassoCd = Math.max(0, lassoCd - dt);
@@ -1668,32 +1802,33 @@ function updatePlay(dt) {
   if (!hostile) { stunUsed = false; stunT = 0; }
   else stunT = Math.max(0, stunT - dt);
   if (!inBush(player.x, player.z)) hiding = false;
-  stickSm.x = damp(stickSm.x, stickTarget.x, dt, 16);
-  stickSm.y = damp(stickSm.y, stickTarget.y, dt, 16);
-  let ix = stickSm.x + ((keys.right ? 1 : 0) - (keys.left ? 1 : 0));
-  let iy = -stickSm.y + ((keys.up ? 1 : 0) - (keys.down ? 1 : 0));
+  let ix = stickTarget.x * sensMul() + ((keys.right ? 1 : 0) - (keys.left ? 1 : 0));
+  let iy = -stickTarget.y * sensMul() + ((keys.up ? 1 : 0) - (keys.down ? 1 : 0));
   let moveMag = Math.hypot(ix, iy);
   if (moveMag > 1) { ix /= moveMag; iy /= moveMag; moveMag = 1; }
-  const moving = moveMag > 0.08;
+  const moving = moveMag > 0.01;
   const sprinting = !!(keys.sprint && moving && stamina > 0.02 && !hiding);
   if (sprinting) stamina = Math.max(0, stamina - dt / 3.2);
   else stamina = Math.min(1, stamina + dt / 2.4);
   const speed = hiding ? 1.4 : (sprinting ? 8.1 : 4.5);
-  const len = Math.min(1, moveMag);
+  const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
+  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  let targetX = 0, targetZ = 0;
   if (moving) {
     const nx = ix / moveMag, ny = iy / moveMag;
-    const camFace = heroYaw + orbitYaw;
-    const fx = Math.sin(camFace), fz = Math.cos(camFace);
-    const rx = Math.cos(camFace), rz = -Math.sin(camFace);
-    const wdx = fx * ny + rx * nx;
-    const wdz = fz * ny + rz * nx;
-    player.x += wdx * speed * len * dt;
-    player.z += wdz * speed * len * dt;
-    heroYaw = dampAngle(heroYaw, Math.atan2(wdx, wdz), dt, 14);
-    walkT += dt * (sprinting ? 14 : 9) * (0.45 + len);
+    targetX = (fx * ny + rx * nx) * speed * moveMag;
+    targetZ = (fz * ny + rz * nx) * speed * moveMag;
+    heroYaw = dampAngle(heroYaw, Math.atan2(targetX, targetZ), dt, 10);
+    walkT += dt * (sprinting ? 14 : 9) * (0.45 + moveMag);
     stepT -= dt;
     if (stepT <= 0) { noiseBurst(0.05, 0.04, 180); stepT = sprinting ? 0.22 : 0.38; }
   }
+  const speeding = Math.hypot(targetX, targetZ) >= Math.hypot(vel.x, vel.z);
+  const vk = 1 - Math.exp(-dt / (speeding ? 0.1 : 0.08));
+  vel.x += (targetX - vel.x) * vk;
+  vel.z += (targetZ - vel.z) * vk;
+  player.x += vel.x * dt;
+  player.z += vel.z * dt;
   pushOut(player);
   if (player.hop > 0) player.hop = Math.max(0, player.hop - dt * 1.6);
   const gy = groundY(player.x, player.z);
@@ -1800,9 +1935,7 @@ function updatePlay(dt) {
     vignette.style.opacity = String(clamp(1 - md / 16, 0, 0.85));
   } else vignette.style.opacity = "0";
 
-  updateOrbit(dt);
-  cameraYaw = heroYaw + orbitYaw;
-  cameraPitch = orbitPitch;
+  updateCamera(dt, moving);
   placeCamera(hostile, md);
   playerLight.position.set(player.x + Math.sin(cameraYaw) * 0.8, gy + 1.5, player.z + Math.cos(cameraYaw) * 0.8);
 }
@@ -1901,7 +2034,7 @@ function placeCamera(hostile, md) {
     for (const c of canopies) c.want = 0;
     camera.position.set(player.x, gy + 1.6, player.z);
     const fx = Math.sin(cameraYaw), fz = Math.cos(cameraYaw);
-    camera.lookAt(player.x + fx * 4, gy + 1.55 + cameraPitch, player.z + fz * 4);
+    camera.lookAt(player.x + fx * 4, gy + 1.55 + cameraPitch * 1.4, player.z + fz * 4);
     return;
   }
   if (scaredNow && state === "play") {
@@ -1918,7 +2051,7 @@ function placeCamera(hostile, md) {
   const ang = cameraYaw + Math.PI;
   const dist = hiding ? 4.2 : 5.4;
   const fx = Math.sin(ang), fz = Math.cos(ang);
-  aimCamera(player.x + fx * dist, gy + 2.15 + cameraPitch * 0.35, player.z + fz * dist, player.x, gy + 1.35, player.z);
+  aimCamera(player.x + fx * dist, gy + 1.95 - cameraPitch * 0.85, player.z + fz * dist, player.x, gy + 1.25 + cameraPitch * 1.15, player.z);
 }
 
 let scareCamReady = false;
@@ -2032,7 +2165,8 @@ function frame(now) {
   } else if (state === "scare") {
     updateScare(dt);
   } else if (state === "pause") {
-    if (pressed.pause || pressed.enter) { state = "play"; showPanel(false); }
+    pauseInput();
+    if (pressed.pause) { state = "play"; showPanel(false); }
     placeCamera(nightFactor > 0.55, Math.hypot(mon.x - player.x, mon.z - player.z));
   } else if (state === "win" || state === "dead") {
     if (pressed.enter) startGame();
@@ -2041,6 +2175,7 @@ function frame(now) {
   placeSpeech();
   updateCanopyFade(dt);
   if (state !== "play") bang.visible = false;
+  paintPadDebug();
   topname.style.display = state === "title" ? "block" : "none";
   for (const k in pressed) delete pressed[k];
   renderer.render(scene, camera);
@@ -2072,11 +2207,13 @@ window.__game = {
   get monsterFace() { return monster.userData.faces.night.visible ? "night" : "day"; },
   get scareHeadOn() { return scareHead.visible; },
   get cameraYaw() { return cameraYaw; },
-  set cameraYaw(v) { heroYaw = v; orbitYaw = 0; cameraYaw = v; },
-  get orbitYaw() { return orbitYaw; },
+  set cameraYaw(v) { camYaw = v; cameraYaw = v; },
+  get orbitYaw() { return camYaw - heroYaw; },
   get lassoT() { return lassoT; },
   get stunT() { return stunT; },
-  get stickMag() { return Math.hypot(stickSm.x, stickSm.y); },
+  get stickMag() { return Math.hypot(stickTarget.x, stickTarget.y); },
+  get padDebugOn() { return debugOn; },
+  togglePadDebug() { debugOn = !debugOn; },
   cameraPos() { return { x: camera.position.x, y: camera.position.y, z: camera.position.z }; },
   heroParts() {
     hero.updateWorldMatrix(true, true);
@@ -2108,7 +2245,7 @@ window.__game = {
   },
   interact,
   forceSurprise: triggerSurprise,
-  forcePause() { if (state === "play" || state === "scare") { state = "pause"; showPanel(true); refreshPanel(); } },
+  forcePause() { if (state === "play" || state === "scare") { state = "pause"; pausePage = "main"; menuRow = 0; showPanel(true); refreshPanel(); } },
 };
 refreshPanel();
 applyChrome();

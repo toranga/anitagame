@@ -20,7 +20,7 @@ export ANDROID_HOME="$HOME/android-sdk"
 cp app/build/outputs/apk/release/app-release.apk ../DontDie.apk
 ```
 
-The build copies `../index.html` and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.3 (versionCode 4) is 2.0 MB (2,048,849 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
+The build copies `../index.html` and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.4 (versionCode 5) is 2.0 MB (2,051,441 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
 
 To release an update:
 
@@ -44,15 +44,16 @@ The page is opened with `?native=1`, which sets `window.__nativePad`. The game t
 
 | Control | DON'T DIE | SPOOKY FOREST |
 | --- | --- | --- |
-| Left stick or D-pad | Run | Move, relative to the camera |
-| Right stick | | Orbit the camera. It eases back behind the Hero. R3 recenters |
-| A | Jump, and start the game | Hide, talk, or pick up. A also starts |
-| B | Laser | Sprint |
-| X | Talk | Swing the lasso |
+| Left stick or D-pad | Run | Move relative to the camera. Up walks forward |
+| Right stick | | Orbit the camera. Right turns right, up looks up. R3 recenters |
+| A | Jump, and start the game | Jump. A also starts from the title |
+| B | Laser | Swing the lasso |
+| X | Talk | Hide, talk, or pick up |
 | Y | Laser | First person |
 | RB | Fly while held | Swing the lasso |
-| RT | Fly while held | Sprint |
-| Start | Start, restart, or pause | Start or pause |
+| LT or L3 | | Sprint |
+| RT | Fly while held | |
+| Start | Opens the pause menu: Resume, Restart, Back to game menu, Quit | Same, plus Options |
 | Select | Hide or show the on-screen buttons | Hide or show the on-screen buttons |
 | Back | Pause. Press Back again within 2 seconds to quit | Pause. Press Back again within 2 seconds to quit |
 | Home | Leaves the app, handled by Android | Leaves the app, handled by Android |
