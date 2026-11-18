@@ -416,3 +416,81 @@ test('native pad flag ignores getGamepads', async ({ browser }) => {
   expect(errors).toEqual([]);
   await context.close();
 });
+
+test('title focus follows the remote, and both look paths turn the same way', async ({ browser }) => {
+  const { context, page, errors } = await openForest(browser, { query: '?native=1' });
+  expect(await page.locator('#prompt').innerText()).toBe('Press A to start');
+  expect(await page.locator('#opts .focus').innerText()).toBe('START GAME');
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-title-focus.png') });
+
+  await page.evaluate(() => window.__menuPress('down'));
+  await page.waitForFunction(() => document.querySelector('#opts .focus').textContent === 'Options');
+  await page.evaluate(() => {
+    const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+    buttons[12] = { pressed: true, value: 1 };
+    window.__nativeButtons = buttons;
+  });
+  await page.waitForFunction(() => document.querySelector('#opts .focus').textContent === 'START GAME');
+  await page.evaluate(() => {
+    window.__nativeButtons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+    window.__nativeCenter = true;
+  });
+  await page.waitForFunction(() => window.__game.state === 'play');
+
+  const yaw0 = await page.evaluate(() => {
+    window.__game.cameraYaw = 0;
+    window.__nativeRightX = 0.95;
+    window.__nativeRightY = 0;
+    return window.__game.cameraYaw;
+  });
+  await page.waitForFunction((y) => window.__game.cameraYaw > y + 0.35, yaw0);
+  const pitch0 = await page.evaluate(() => {
+    window.__nativeRightX = 0;
+    window.__nativeRightY = -0.95;
+    return window.__game.cameraPitch;
+  });
+  await page.waitForFunction((p) => window.__game.cameraPitch > p + 0.2, pitch0);
+  await page.evaluate(() => { window.__nativeRightX = 0; window.__nativeRightY = 0; });
+
+  await page.evaluate(() => window.__game.forcePause());
+  await page.keyboard.press('ArrowDown');
+  await page.waitForTimeout(80);
+  await page.keyboard.press('ArrowDown');
+  await page.waitForFunction(() => document.querySelector('#opts .focus').textContent === 'Options');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#opts button').nth(1)).toHaveText(/Invert camera Y: OFF/);
+  await expect(page.locator('#opts button').nth(2)).toHaveText(/Invert camera X: OFF/);
+  expect(errors).toEqual([]);
+  await context.close();
+
+  const gamepad = await browser.newContext({ viewport: { width: 1280, height: 720 }, baseURL: 'http://127.0.0.1:4173' });
+  await gamepad.addInitScript(() => {
+    const state = { axes: [0, 0, 0, 0] };
+    window.__pad = { look(x, y) { state.axes[2] = x; state.axes[3] = y; } };
+    navigator.getGamepads = () => [{
+      id: 'Mock Pad', index: 0, connected: true, mapping: 'standard',
+      axes: state.axes.slice(),
+      buttons: Array.from({ length: 16 }, () => ({ pressed: false, value: 0 })),
+      timestamp: Date.now(),
+    }];
+  });
+  const padPage = await gamepad.newPage();
+  const padErrors = track(padPage);
+  await padPage.goto('/forest/index.html');
+  await padPage.waitForFunction(() => window.__game && window.__game.state === 'title');
+  await padPage.keyboard.press('Enter');
+  await padPage.waitForFunction(() => window.__game.state === 'play');
+  const gy = await padPage.evaluate(() => {
+    window.__game.cameraYaw = 0;
+    window.__pad.look(0.95, 0);
+    return window.__game.cameraYaw;
+  });
+  await padPage.waitForFunction((y) => window.__game.cameraYaw > y + 0.35, gy);
+  const gp = await padPage.evaluate(() => {
+    window.__pad.look(0, -0.95);
+    return window.__game.cameraPitch;
+  });
+  await padPage.waitForFunction((p) => window.__game.cameraPitch > p + 0.2, gp);
+  expect(padErrors).toEqual([]);
+  await gamepad.close();
+});

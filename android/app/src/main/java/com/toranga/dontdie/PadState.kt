@@ -20,6 +20,8 @@ class PadState {
         private set
     var leftTrigger: Float = 0f
         private set
+    var center: Boolean = false
+        private set
     var axisY: Float = 0f
         private set
     var rightX: Float = 0f
@@ -57,6 +59,10 @@ class PadState {
         this.hatY = hatY
         this.rightTrigger = rightTrigger
         this.leftTrigger = leftTrigger
+    }
+
+    fun onCenter(down: Boolean) {
+        center = down
     }
 
     fun effective(index: Int): Boolean = when (index) {
@@ -100,6 +106,8 @@ class PadState {
         sb.append(fmt(hatX))
         sb.append(";window.__nativeHatY=")
         sb.append(fmt(hatY))
+        sb.append(";window.__nativeCenter=")
+        sb.append(if (center) "true" else "false")
         sb.append(";window.__nativeButtons=[")
         for (index in pressed.indices) {
             if (index > 0) sb.append(',')

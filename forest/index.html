@@ -26,9 +26,9 @@
   h1{margin:0 0 6px;font:900 40px "Arial Black",Arial;letter-spacing:1px;color:#ffe08a;text-shadow:0 4px 18px #000}
   .sub{margin:0 0 8px;font-size:16px}
   .opts{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin:8px 0}
-  .opt{border:2px solid #ffffff44;background:#0006;color:#fff;border-radius:999px;padding:7px 12px;font:700 14px Arial;cursor:pointer}
+  .opt{display:block;width:min(460px,92%);margin:8px auto;border:3px solid #ffffff44;background:#0008;color:#fff;border-radius:16px;padding:14px 18px;font:800 20px Arial;cursor:pointer}
   .opt.on{border-color:#ffe08a;color:#ffe08a}
-  .opt.focus{outline:3px solid #fff}
+  .opt.focus{background:#ffe08a;color:#1a1030;border-color:#fff;outline:4px solid #fff;box-shadow:0 0 0 6px #ffe08a99,0 10px 28px #000a;transform:scale(1.05)}
   .help{font-size:13px;line-height:1.45;opacity:.92}
   .prompt{font:900 20px Arial;color:#ffe08a;min-height:26px}
   #topname{position:fixed;top:8px;left:0;right:0;text-align:center;z-index:6;font:900 42px "Arial Black",Arial;color:#ffe08a;text-shadow:0 4px 16px #000;pointer-events:none}
@@ -79,6 +79,7 @@
 <div id="speech"></div>
 <div id="pad-debug"></div>
 <div id="boot-error"></div>
+<script src="../menu-input.js"></script>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js" } }
 </script>
@@ -1063,7 +1064,7 @@ let phaseName = "day";
 let phaseLeft = DAY;
 let jumpscareMode = "scary";
 let startAt = "day";
-let menuRow = 0;
+let menuRow = 2;
 let scared = false;
 let wasChasing = false;
 let spotT = 0;
@@ -1109,10 +1110,12 @@ const LS_SCARE = "spooky-jumpscares";
 const LS_START = "spooky-start";
 const LS_SENS = "spooky-sens";
 const LS_INVERT = "spooky-invert-y";
+const LS_INVERTX = "spooky-invert-x";
 const LS_FOLLOW = "spooky-follow";
 const LS_DEBUG = "spooky-pad-debug";
 let stickSens = "med";
 let invertY = false;
+let invertX = false;
 let camFollow = false;
 let pausePage = "main";
 let menuStick = 0;
@@ -1128,6 +1131,7 @@ try {
   const sens = localStorage.getItem(LS_SENS);
   if (sens === "low" || sens === "med" || sens === "high") stickSens = sens;
   invertY = localStorage.getItem(LS_INVERT) === "1";
+  invertX = localStorage.getItem(LS_INVERTX) === "1";
   camFollow = localStorage.getItem(LS_FOLLOW) === "1";
   debugOn = localStorage.getItem(LS_DEBUG) === "1";
 } catch (e) {}
@@ -1561,8 +1565,12 @@ function paintPadDebug() {
     "path " + padRaw.path + "   hold Select 2s to hide",
     "raw L " + f(padRaw.lx) + " " + f(padRaw.ly) + "   R " + f(padRaw.rx) + " " + f(padRaw.ry),
     "hat " + f(padRaw.hatX) + " " + f(padRaw.hatY) + "   L2 " + f(padRaw.l2) + " R2 " + f(padRaw.r2),
-    "curved L " + f(stickTarget.x) + " " + f(stickTarget.y) + "   R " + f(lookTarget.x) + " " + f(lookTarget.y),
-    "up is negative Y and walks forward. right is positive X.",
+    "right stick page X " + f(padRaw.rx) + "  Y " + f(padRaw.ry),
+    "right stick curved X " + f(lookTarget.x) + "  Y " + f(lookTarget.y),
+    "native right X " + f(axisNum(window.__nativeRightX)) + "  Y " + f(axisNum(window.__nativeRightY)),
+    "curved move L " + f(stickTarget.x) + " " + f(stickTarget.y),
+    "positive right-X turns right. negative right-Y looks up.",
+    "invert X " + (invertX ? "ON" : "OFF") + "   invert Y " + (invertY ? "ON" : "OFF"),
   ].join("\n");
 }
 function hint(text, ms) {
@@ -1587,8 +1595,9 @@ function updateCamera(dt, moving) {
   if (looking) lookIdle = 0;
   else lookIdle += dt;
   const mul = sensMul();
+  const xSign = invertX ? -1 : 1;
   const ySign = invertY ? -1 : 1;
-  camYaw += lookTarget.x * 3 * mul * dt;
+  camYaw += lookTarget.x * xSign * 3 * mul * dt;
   camYaw += lookDX * 0.005;
   camPitch = clamp(camPitch - lookTarget.y * ySign * 2 * mul * dt - lookDY * 0.003, -0.85, 0.7);
   lookDX = 0;
@@ -1673,7 +1682,7 @@ function showPanel(on) {
 }
 
 function refreshPanel() {
-  const optsOn = state === "title" || state === "pause";
+  const optsOn = state === "title" || state === "pause" || state === "win" || state === "dead";
   opts.style.display = optsOn ? "flex" : "none";
   help.style.display = optsOn ? "block" : "none";
   document.getElementById("hud").style.display = state === "title" ? "none" : "block";
@@ -1682,7 +1691,7 @@ function refreshPanel() {
     heading.textContent = "";
     blurb.textContent = "You are the Hero, lost in the woods. Collect 7 lanterns and reach the gate. The monster is friendly by day.";
     help.innerHTML = CONTROLS_HELP;
-    prompt.textContent = isTouch ? "Tap to start" : "Press ENTER or A";
+    prompt.textContent = controllerPrompt();
     drawOpts();
   } else if (state === "pause") {
     heading.textContent = "PAUSED";
@@ -1693,11 +1702,15 @@ function refreshPanel() {
   } else if (state === "win") {
     heading.textContent = "YOU ESCAPED THE FOREST!";
     blurb.textContent = "All 7 lanterns lit the way. The Hero made it out.";
-    prompt.textContent = "Press ENTER to play again";
+    prompt.textContent = controllerPrompt();
+    menuRow = 0;
+    drawOpts();
   } else if (state === "dead") {
     heading.textContent = "TRY AGAIN";
     blurb.textContent = "The night was too spooky. You have another chance.";
-    prompt.textContent = "Press ENTER to try again";
+    prompt.textContent = controllerPrompt();
+    menuRow = 0;
+    drawOpts();
   }
 }
 const CONTROLS_HELP = "Left stick or D-pad moves. Right stick looks, and R3 recenters. A jumps. X hides, talks, or picks up. B or RB swings the lasso. LT or L3 sprints. Y is first person. Start pauses. Hold Select for the stick readout.";
@@ -1725,15 +1738,37 @@ function optionActions() {
   return [
     ["Stick sensitivity: " + stickSens.toUpperCase(), () => { stickSens = order[(order.indexOf(stickSens) + 1) % 3]; save(LS_SENS, stickSens); drawOpts(); }],
     ["Invert camera Y: " + (invertY ? "ON" : "OFF"), () => { invertY = !invertY; save(LS_INVERT, invertY ? "1" : "0"); drawOpts(); }],
+    ["Invert camera X: " + (invertX ? "ON" : "OFF"), () => { invertX = !invertX; save(LS_INVERTX, invertX ? "1" : "0"); drawOpts(); }],
     ["Camera follow: " + (camFollow ? "ON" : "OFF"), () => { camFollow = !camFollow; save(LS_FOLLOW, camFollow ? "1" : "0"); drawOpts(); }],
   ];
 }
-function drawOpts() {
-  opts.innerHTML = "";
-  const items = state === "pause" ? (pausePage === "options" ? optionActions() : pauseActions()) : [
+function controllerPrompt() {
+  const pad = window.MenuInput && MenuInput.usingController();
+  if (pad || window.__nativePad) return "Press A to start";
+  return isTouch ? "Tap to start" : "Press ENTER or A";
+}
+function titleActions() {
+  if (pausePage === "options") return optionActions();
+  return [
     ["Jumpscares: " + (jumpscareMode === "mild" ? "MILD" : "SCARY"), () => { jumpscareMode = jumpscareMode === "mild" ? "scary" : "mild"; save(LS_SCARE, jumpscareMode); drawOpts(); }],
     ["Start at: " + (startAt === "night" ? "NIGHT" : "DAY"), () => { startAt = startAt === "night" ? "day" : "night"; save(LS_START, startAt); drawOpts(); }],
+    ["START GAME", startGame],
+    ["Options", () => { pausePage = "options"; menuRow = 0; drawOpts(); }],
   ];
+}
+function endActions() {
+  const items = [
+    ["Play again", startGame],
+    ["Back to game menu", backToPicker],
+  ];
+  if (canQuitApp()) items.push(["Quit app", () => window.AnitaApp.quit()]);
+  return items;
+}
+function drawOpts() {
+  opts.innerHTML = "";
+  const items = state === "pause"
+    ? (pausePage === "options" ? optionActions() : pauseActions())
+    : (state === "win" || state === "dead" ? endActions() : titleActions());
   items.forEach((it, i) => {
     const b = document.createElement("button");
     b.type = "button";
@@ -1748,41 +1783,32 @@ panel.addEventListener("click", () => {
   if (state === "title" || state === "win" || state === "dead") startGame();
 });
 
-function menuInput() {
-  const count = 2;
-  if (pressed.left || pressed.right) {
-    if (menuRow === 0) { jumpscareMode = jumpscareMode === "mild" ? "scary" : "mild"; save(LS_SCARE, jumpscareMode); }
-    else { startAt = startAt === "night" ? "day" : "night"; save(LS_START, startAt); }
-    drawOpts();
-  }
-  if (pressed.up || pressed.down) { menuRow = (menuRow + (pressed.down ? 1 : count - 1)) % count; drawOpts(); }
-  if (pressed.enter) startGame();
+function menuItems() {
+  if (state === "pause") return pausePage === "options" ? optionActions() : pauseActions();
+  if (state === "win" || state === "dead") return endActions();
+  return titleActions();
 }
-function stickMenuDir() {
-  const y = stickTarget.y;
-  let dir = 0;
-  if (y < -0.45) dir = -1;
-  else if (y > 0.45) dir = 1;
-  if (dir === 0) { menuStick = 0; return 0; }
-  if (menuStick === dir) return 0;
-  menuStick = dir;
-  return dir;
-}
-function pauseInput() {
-  const items = pausePage === "options" ? optionActions() : pauseActions();
+function driveMenu(ev) {
+  ev = ev || { up: 0, down: 0, left: 0, right: 0, confirm: 0, cancel: 0, start: 0 };
+  const items = menuItems();
   const count = items.length;
+  if (!count) return;
   if (menuRow >= count) menuRow = 0;
-  let dir = (pressed.down ? 1 : 0) - (pressed.up ? 1 : 0);
-  if (!dir) dir = stickMenuDir();
+  let dir = 0;
+  if (ev.down || ev.right) dir = 1;
+  else if (ev.up || ev.left) dir = -1;
   if (dir) { menuRow = (menuRow + dir + count) % count; drawOpts(); }
-  if (pressed.backmenu) {
-    if (pausePage === "options") { pausePage = "main"; menuRow = 2; drawOpts(); }
-    else resumeGame();
+  if (ev.cancel) {
+    if (pausePage === "options") {
+      pausePage = "root";
+      menuRow = state === "title" ? 3 : 2;
+      drawOpts();
+    } else if (state === "pause") resumeGame();
     return;
   }
-  if (pressed.confirm || pressed.enter || pressed.left || pressed.right) {
-    if (pausePage === "options" || pressed.confirm || pressed.enter) items[menuRow][1]();
-  }
+  if (ev.start && (state === "title" || state === "win" || state === "dead")) { startGame(); return; }
+  if (ev.start && state === "pause" && pausePage !== "options") { resumeGame(); return; }
+  if (ev.confirm) items[menuRow][1]();
 }
 
 function updatePlay(dt) {
@@ -2151,13 +2177,14 @@ function frame(now) {
   const dt = Math.min(0.033, (now - last) / 1000) || 0.016;
   last = now;
   pollPad();
+  const menuEv = window.MenuInput ? MenuInput.poll() : null;
   if (pressed.mute) muted = !muted;
   if (pressed.hidetoggle) toggleButtons();
   if (!window.__nativePad && padConnected && manualHide === null) { /* auto hide via buttonsHidden */ }
   applySky();
   if (state === "title") {
     layoutTitle();
-    menuInput();
+    driveMenu(menuEv);
     topname.style.display = "block";
   } else if (state === "play") {
     cycleT += dt;
@@ -2165,11 +2192,11 @@ function frame(now) {
   } else if (state === "scare") {
     updateScare(dt);
   } else if (state === "pause") {
-    pauseInput();
+    driveMenu(menuEv);
     if (pressed.pause) { state = "play"; showPanel(false); }
     placeCamera(nightFactor > 0.55, Math.hypot(mon.x - player.x, mon.z - player.z));
   } else if (state === "win" || state === "dead") {
-    if (pressed.enter) startGame();
+    driveMenu(menuEv);
   }
   refreshHud();
   placeSpeech();
@@ -2208,6 +2235,7 @@ window.__game = {
   get scareHeadOn() { return scareHead.visible; },
   get cameraYaw() { return cameraYaw; },
   set cameraYaw(v) { camYaw = v; cameraYaw = v; },
+  get cameraPitch() { return camPitch; },
   get orbitYaw() { return camYaw - heroYaw; },
   get lassoT() { return lassoT; },
   get stunT() { return stunT; },

@@ -18,6 +18,7 @@
 </head>
 <body>
 <div id="game"></div>
+<script src="menu-input.js"></script>
 <script>
 // The Android TV app loads this page with ?native=1 and sets window.__nativePad.
 // While that flag is set, pollGamepad() ignores navigator.getGamepads() so a
@@ -392,11 +393,19 @@ function update(dt){
   T += dt;
   if (pressed.hidetoggle) toggleButtons();
   if (pressed.mute){ muted = !muted; }
-  if (state === 'title'){ if (pressed.enter){ newGame(); state = 'play'; SFX.gate(); } return; }
-  if (state === 'dead' || state === 'win'){ if (pressed.enter){ newGame(); state = 'play'; SFX.gate(); } updateFx(dt); return; }
-  if (state === 'dying'){ deadT -= dt; updateFx(dt); if (deadT <= 0) state = 'dead'; return; }
-  if (pressed.pause) { paused = !paused; if (paused) pauseRow = 0; }
-  if (paused) { updatePauseMenu(); updateFx(dt); return; }
+  if (state === 'title'){
+    const ev = window.MenuInput ? MenuInput.poll() : { confirm: 0, start: 0 };
+    if (ev.confirm || ev.start || pressed.enter){ newGame(); state = 'play'; SFX.gate(); }
+    return;
+  }
+  if (state === 'dead' || state === 'win'){ updateEndMenu(); updateFx(dt); return; }
+  if (state === 'dying'){ if (window.MenuInput) MenuInput.poll(); deadT -= dt; updateFx(dt); if (deadT <= 0){ state = 'dead'; pauseRow = 0; } return; }
+  const menuEv = (state !== 'title' && window.MenuInput) ? MenuInput.poll() : null;
+  if (pressed.pause) {
+    paused = !paused;
+    if (paused) { pauseRow = 0; updateFx(dt); return; }
+  }
+  if (paused) { updatePauseMenu(menuEv); updateFx(dt); return; }
   const p = player;
   hintT -= dt; p.inv = Math.max(0, p.inv - dt); p.cool -= dt; shake = Math.max(0, shake - dt);
 
@@ -482,7 +491,7 @@ function update(dt){
   if (!B.active && p.x > GATE_X + 120){ B.active = true; say(B, "ROAR! Who goes there?!", 2.5); }
   if (B.active){
     B.t += dt; B.flash = Math.max(0, B.flash - dt); B.stun = Math.max(0, B.stun - dt);
-    if (B.defeated){ B.endT -= dt; if (B.endT <= 0 && state === 'play'){ state = 'win'; winT = 0; } }
+    if (B.defeated){ B.endT -= dt; if (B.endT <= 0 && state === 'play'){ state = 'win'; winT = 0; pauseRow = 0; } }
     else {
       const enraged = B.hp <= B.max/2;
       if (B.stun <= 0){
@@ -699,13 +708,30 @@ function backToPicker(){
   if (window.__nativePad || canQuitApp()) { location.href = 'launcher.html?native=1'; return; }
   paused = false; state = 'title';
 }
-function updatePauseMenu(){
+function endItems(){
+  const items = ['Play again', 'Back to game menu'];
+  if (canQuitApp()) items.push('Quit app');
+  return items;
+}
+function updateEndMenu(){
+  const ev = window.MenuInput ? MenuInput.poll() : { up: 0, down: 0, left: 0, right: 0, confirm: 0, cancel: 0, start: 0 };
+  const items = endItems();
+  if (pauseRow >= items.length) pauseRow = 0;
+  if (ev.up || ev.left) pauseRow = (pauseRow + items.length - 1) % items.length;
+  if (ev.down || ev.right) pauseRow = (pauseRow + 1) % items.length;
+  const pick = ev.start ? 'Play again' : ((ev.confirm || pressed.enter) ? items[pauseRow] : '');
+  if (pick === 'Play again') { newGame(); state = 'play'; SFX.gate(); }
+  else if (pick === 'Back to game menu') backToPicker();
+  else if (pick === 'Quit app' && window.AnitaApp) window.AnitaApp.quit();
+}
+function updatePauseMenu(ev){
+  ev = ev || { up: 0, down: 0, left: 0, right: 0, confirm: 0, cancel: 0, start: 0 };
   const items = pauseItems();
   if (pauseRow >= items.length) pauseRow = 0;
-  if (pressed.menuup || pressed.up) pauseRow = (pauseRow + items.length - 1) % items.length;
-  if (pressed.menudown || pressed.down) pauseRow = (pauseRow + 1) % items.length;
-  if (pressed.laser) { paused = false; keys.laser = false; if (heldBy.pad) delete heldBy.pad.laser; return; }
-  if (!(pressed.jump || pressed.enter)) return;
+  if (ev.up || ev.left) pauseRow = (pauseRow + items.length - 1) % items.length;
+  if (ev.down || ev.right) pauseRow = (pauseRow + 1) % items.length;
+  if (ev.cancel || pressed.laser) { paused = false; keys.laser = false; if (heldBy.pad) delete heldBy.pad.laser; return; }
+  if (!(ev.confirm || pressed.enter)) return;
   const pick = items[pauseRow];
   if (pick === 'Resume') paused = false;
   else if (pick === 'Restart') { paused = false; newGame(); state = 'play'; }
@@ -742,7 +768,7 @@ function drawTitle(){
   const line = [['hero',120,140],['friend',110,250],['boss',210,480],['pink',100,710],['blob',85,830]];
   for (const [k,h,x] of line) drawSprite(IMG[k], x, GROUND + 6 + (k==='boss'?0:Math.sin(T*4 + x)*-4), h, false, 1, 0, 1, 1);
   ctx.textAlign = 'center';
-  const prompt = padConnected ? 'Press A or START to play' : (isTouch ? 'Tap the screen to start' : 'Press ENTER to start');
+  const prompt = (padConnected || (window.MenuInput && MenuInput.usingController())) ? 'Press A to start' : (isTouch ? 'Tap the screen to start' : 'Press ENTER to start');
   if (Math.floor(T*2) % 2 === 0){ ctx.font = 'bold 28px "Arial Black", Arial'; ctx.fillStyle = '#ffe35a'; ctx.strokeStyle = '#1a0630'; ctx.lineWidth = 6; ctx.strokeText(prompt, W/2, 208); ctx.fillText(prompt, W/2, 208); }
   roundRect(W/2 - 400, 222, 800, 128, 14); ctx.fillStyle = '#0a0a2acc'; ctx.fill();
   ctx.font = 'bold 15px Arial'; ctx.fillStyle = '#fff';
@@ -768,9 +794,12 @@ function drawEnd(){
     ctx.font = 'bold 26px Arial'; ctx.fillStyle = '#fff'; ctx.fillText('You found all 5 diamonds and beat the cat monster!', W/2, 265);
     ctx.fillStyle = '#7ff6ff'; ctx.fillText('YOU ARE A HERO!', W/2, 305);
   }
-  if (Math.floor(T*2) % 2 === 0){ ctx.font = 'bold 26px "Arial Black", Arial'; ctx.fillStyle = '#ffe35a';
-    const again = padConnected ? (state === 'dead' ? 'Press A or START to try again' : 'Press A or START to play again') : (isTouch ? (state === 'dead' ? 'Tap to try again' : 'Tap to play again') : (state === 'dead' ? 'Press ENTER to try again' : 'Press ENTER to play again'));
-    ctx.fillText(again, W/2, 380); }
+  const items = endItems();
+  items.forEach((label, i) => {
+    ctx.font = 'bold 28px Arial';
+    ctx.fillStyle = i === pauseRow ? '#ffe35a' : '#ffffff';
+    ctx.fillText((i === pauseRow ? '> ' : '') + label, W/2, 370 + i * 40);
+  });
 }
 function draw(){
   ctx.save();

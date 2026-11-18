@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.4",
+  "versionCode": 6,
+  "versionName": "1.5",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "Roblox-style sticks: forward is stick up, softer sensitivity, and a jump."
+  "notes": "Title menu works with the Shield remote, and the right stick looks the right way."
 }
