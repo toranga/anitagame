@@ -18,6 +18,8 @@ class PadState {
         private set
     var rightTrigger: Float = 0f
         private set
+    var leftTrigger: Float = 0f
+        private set
     var axisY: Float = 0f
         private set
     var rightX: Float = 0f
@@ -45,6 +47,7 @@ class PadState {
         axisY: Float = 0f,
         rightX: Float = 0f,
         rightY: Float = 0f,
+        leftTrigger: Float = 0f,
     ) {
         this.axisX = axisX
         this.axisY = axisY
@@ -53,6 +56,7 @@ class PadState {
         this.hatX = hatX
         this.hatY = hatY
         this.rightTrigger = rightTrigger
+        this.leftTrigger = leftTrigger
     }
 
     fun effective(index: Int): Boolean = when (index) {
@@ -60,6 +64,7 @@ class PadState {
         GamepadMap.DPAD_RIGHT -> keys[index] || hatX > 0.5f
         GamepadMap.DPAD_UP -> keys[index] || hatY < -0.5f
         GamepadMap.DPAD_DOWN -> keys[index] || hatY > 0.5f
+        GamepadMap.L2 -> keys[index] || leftTrigger > 0.5f
         GamepadMap.R2 -> keys[index] || rightTrigger > 0.5f
         else -> keys[index]
     }
@@ -87,6 +92,10 @@ class PadState {
         sb.append(fmt(rightX))
         sb.append(";window.__nativeRightY=")
         sb.append(fmt(rightY))
+        sb.append(";window.__nativeL2=")
+        sb.append(fmt(leftTrigger))
+        sb.append(";window.__nativeR2=")
+        sb.append(fmt(rightTrigger))
         sb.append(";window.__nativeButtons=[")
         for (index in pressed.indices) {
             if (index > 0) sb.append(',')

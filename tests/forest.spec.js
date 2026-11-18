@@ -213,6 +213,66 @@ test('mocked gamepad starts and moves', async ({ browser }) => {
   const z0 = await page.evaluate(() => window.__game.player.z);
   await page.evaluate(() => window.__pad.axis(0, -0.9));
   await page.waitForFunction((z) => window.__game.player.z > z + 0.5, z0);
+  await page.evaluate(() => window.__pad.axis(0, 0));
+  const z1 = await page.evaluate(() => window.__game.player.z);
+  await page.evaluate(() => window.__pad.set(12, true));
+  await page.waitForFunction((z) => window.__game.player.z > z + 0.3, z1);
+  await page.evaluate(() => window.__pad.set(12, false));
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('lasso swing and right-stick camera orbit', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, baseURL: 'http://127.0.0.1:4173' });
+  await context.addInitScript(() => {
+    const blank = () => Array.from({ length: 17 }, () => ({ pressed: false, value: 0 }));
+    const state = { buttons: blank(), axes: [0, 0, 0, 0] };
+    window.__pad = {
+      set(i, down) { state.buttons[i].pressed = !!down; state.buttons[i].value = down ? 1 : 0; },
+      axis(x, y) { state.axes[0] = x; state.axes[1] = y; },
+      look(x, y) { state.axes[2] = x; state.axes[3] = y; },
+    };
+    navigator.getGamepads = () => [{
+      id: 'Mock Pad', index: 0, connected: true, mapping: 'standard',
+      axes: state.axes.slice(),
+      buttons: state.buttons.map((b) => ({ pressed: b.pressed, value: b.value, touched: b.pressed })),
+      timestamp: Date.now(),
+    }];
+  });
+  const page = await context.newPage();
+  const errors = track(page);
+  await page.goto('/forest/index.html');
+  await page.waitForFunction(() => window.__game && window.__game.state === 'title');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__game.state === 'play');
+  const before = await page.evaluate(() => {
+    window.__game.setPhase('day');
+    window.__game.cameraYaw = 0;
+    window.__game.player.x = 0;
+    window.__game.player.z = 4;
+    const l = window.__game.lanterns[0];
+    l.x = 0;
+    l.z = 8;
+    l.got = false;
+    l.mesh.visible = true;
+    l.mesh.position.set(0, 1.4, 8);
+    return window.__game.collected;
+  });
+  await page.keyboard.press('f');
+  await page.waitForFunction(() => window.__game.lassoT > 0);
+  await page.waitForTimeout(120);
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-lasso.png') });
+  await page.waitForFunction((n) => window.__game.collected > n, before);
+
+  const yaw0 = await page.evaluate(() => window.__game.cameraYaw);
+  await page.evaluate(() => window.__pad.look(0.95, 0.2));
+  await page.waitForFunction((y) => Math.abs(window.__game.cameraYaw - y) > 0.35, yaw0);
+  await page.waitForTimeout(180);
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-camera.png') });
+  const swung = await page.evaluate(() => window.__game.orbitYaw);
+  expect(Math.abs(swung)).toBeGreaterThan(0.2);
+  await page.evaluate(() => window.__pad.look(0, 0));
+  await page.waitForFunction(() => Math.abs(window.__game.orbitYaw) < 0.12, { timeout: 4000 });
   expect(errors).toEqual([]);
   await context.close();
 });
@@ -222,6 +282,7 @@ test('Pixel 7 shows touch controls', async ({ browser }) => {
   await expect(page.locator('#joy')).toBeVisible();
   await expect(page.locator('#btn-sprint')).toBeVisible();
   await expect(page.locator('#btn-hide')).toBeVisible();
+  await expect(page.locator('#btn-lasso')).toBeVisible();
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => window.__game.state === 'play');
   expect(errors).toEqual([]);

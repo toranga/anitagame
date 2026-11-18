@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="560dp"
+    android:layout_height="wrap_content"
+    android:background="#F0121828"
+    android:orientation="vertical"
+    android:padding="28dp">
+
+    <TextView
+        android:id="@+id/update_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="New version available!"
+        android:textColor="#FFE08A"
+        android:textSize="32sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/update_notes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp" />
+
+    <Button
+        android:id="@+id/update_now"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="22dp"
+        android:background="#FFE08A"
+        android:focusable="true"
+        android:nextFocusDown="@id/update_later"
+        android:text="Update now"
+        android:textAllCaps="false"
+        android:textColor="#121018"
+        android:textSize="22sp"
+        android:textStyle="bold" />
+
+    <Button
+        android:id="@+id/update_later"
+        android:layout_width="match_parent"
+        android:layout_height="64dp"
+        android:layout_marginTop="12dp"
+        android:background="#223044"
+        android:focusable="true"
+        android:nextFocusUp="@id/update_now"
+        android:text="Later"
+        android:textAllCaps="false"
+        android:textColor="#FFFFFF"
+        android:textSize="22sp" />
+</LinearLayout>

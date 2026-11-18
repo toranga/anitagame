@@ -9,7 +9,7 @@
   body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
   h1{margin:0;font-size:42px;color:#ffe08a;letter-spacing:1px}
   p{margin:0;opacity:.8}
-  button{width:min(520px,80vw);padding:22px 18px;border-radius:18px;border:3px solid #ffffff33;background:#12182a;color:#fff;font:800 28px Arial;cursor:pointer}
+  button{width:min(520px,80vw);padding:18px;border-radius:18px;border:3px solid #ffffff33;background:#12182a;color:#fff;font:800 26px Arial;cursor:pointer}
   button.on{border-color:#ffe08a;color:#ffe08a;box-shadow:0 0 24px #ffe08a44}
 </style>
 </head>
@@ -18,16 +18,24 @@
 <p>D-pad to choose. A to play.</p>
 <button id="b0" type="button">DON'T DIE</button>
 <button id="b1" type="button">SPOOKY FOREST</button>
+<button id="b2" type="button">Check for updates</button>
 <script>
 if (/(?:\?|&)native=1(?:&|$)/.test(location.search || "")) window.__nativePad = true;
-const games = ["index.html?native=1", "forest/index.html?native=1"];
+const games = ["index.html?native=1", "forest/index.html?native=1", "update"];
 let sel = 0;
-const buttons = [document.getElementById("b0"), document.getElementById("b1")];
+const buttons = [document.getElementById("b0"), document.getElementById("b1"), document.getElementById("b2")];
 const prev = {};
 function paint() { buttons.forEach((b, i) => b.classList.toggle("on", i === sel)); }
-function go() { location.href = games[sel]; }
+function go() {
+  if (games[sel] === "update") {
+    if (window.AndroidUpdates && AndroidUpdates.check) AndroidUpdates.check();
+    return;
+  }
+  location.href = games[sel];
+}
 buttons[0].onclick = () => { sel = 0; go(); };
 buttons[1].onclick = () => { sel = 1; go(); };
+buttons[2].onclick = () => { sel = 2; go(); };
 function edge(i, down) {
   const was = !!prev[i];
   prev[i] = down;
@@ -46,8 +54,8 @@ function readPad() {
   return null;
 }
 window.addEventListener("keydown", (e) => {
-  if (e.key === "ArrowUp" || e.key === "ArrowLeft") { sel = 0; paint(); e.preventDefault(); }
-  else if (e.key === "ArrowDown" || e.key === "ArrowRight") { sel = 1; paint(); e.preventDefault(); }
+  if (e.key === "ArrowUp" || e.key === "ArrowLeft") { sel = (sel + buttons.length - 1) % buttons.length; paint(); e.preventDefault(); }
+  else if (e.key === "ArrowDown" || e.key === "ArrowRight") { sel = (sel + 1) % buttons.length; paint(); e.preventDefault(); }
   else if (e.key === "Enter") { go(); e.preventDefault(); }
 });
 function frame() {
@@ -55,8 +63,8 @@ function frame() {
   if (pad) {
     const up = btn(pad, 12) || (pad.axes && pad.axes[1] < -0.6);
     const down = btn(pad, 13) || (pad.axes && pad.axes[1] > 0.6);
-    if (edge(12, up)) sel = 0;
-    if (edge(13, down)) sel = 1;
+    if (edge(12, up)) sel = (sel + buttons.length - 1) % buttons.length;
+    if (edge(13, down)) sel = (sel + 1) % buttons.length;
     if (edge(0, btn(pad, 0)) || edge(9, btn(pad, 9))) go();
     paint();
   }

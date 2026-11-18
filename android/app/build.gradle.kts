@@ -3,16 +3,25 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
+val updateManifestUrl = (findProperty("updateManifestUrl") as String?)
+    ?: "https://toranga.github.io/anitagame/version.json"
+val versionCodeOverride = (findProperty("versionCodeOverride") as String?)?.toIntOrNull()
+
 android {
     namespace = "com.toranga.dontdie"
     compileSdk = 36
+
+    buildFeatures {
+        buildConfig = true
+    }
 
     defaultConfig {
         applicationId = "com.toranga.dontdie"
         minSdk = 21
         targetSdk = 36
-        versionCode = 3
-        versionName = "1.2"
+        versionCode = versionCodeOverride ?: 4
+        versionName = "1.3"
+        buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
     }
 
     buildTypes {

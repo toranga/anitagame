@@ -15,6 +15,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.webkit.JavascriptInterface
 import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.webkit.WebViewAssetLoader
@@ -27,6 +28,7 @@ class MainActivity : Activity() {
     private var flushPosted = false
     private var lastBackMs = 0L
     private var lastBackDeliveryMs = 0L
+    private lateinit var updates: AppUpdateController
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,7 +43,20 @@ class MainActivity : Activity() {
         enterImmersive()
         hidePointer()
         configureWebView(webView)
+        updates = AppUpdateController(this)
+        webView.addJavascriptInterface(UpdateBridge(), "AndroidUpdates")
         webView.loadUrl(GAME_URL)
+        updates.checkOnLaunch()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::updates.isInitialized) updates.onResume()
+    }
+
+    override fun onDestroy() {
+        if (::updates.isInitialized) updates.destroy()
+        super.onDestroy()
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
@@ -55,6 +70,7 @@ class MainActivity : Activity() {
     }
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (::updates.isInitialized && updates.onKey(event)) return true
         if (event.keyCode == KeyEvent.KEYCODE_HOME) return super.dispatchKeyEvent(event)
         if (GamepadMap.isBack(event.keyCode)) {
             if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) handleBack()
@@ -82,7 +98,11 @@ class MainActivity : Activity() {
             ),
             event.getAxisValue(MotionEvent.AXIS_Y),
             stick(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX),
-            stick(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY)
+            stick(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY),
+            maxOf(
+                event.getAxisValue(MotionEvent.AXIS_LTRIGGER),
+                event.getAxisValue(MotionEvent.AXIS_BRAKE)
+            )
         )
         scheduleFlush()
         return true
@@ -188,6 +208,13 @@ class MainActivity : Activity() {
         val empty = PointerIcon.getSystemIcon(this, PointerIcon.TYPE_NULL)
         webView.pointerIcon = empty
         window.decorView.pointerIcon = empty
+    }
+
+    private inner class UpdateBridge {
+        @JavascriptInterface
+        fun check() {
+            runOnUiThread { updates.checkFromMenu() }
+        }
     }
 
     companion object {
