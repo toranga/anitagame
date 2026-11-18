@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.7",
+  "versionCode": 9,
+  "versionName": "2.0",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "Pushing the right stick right turns the view right."
+  "notes": "Richer forest lighting, ground and bark textures, and a graphics setting for the Shield."
 }
