@@ -36,7 +36,8 @@
   #touch{position:fixed;inset:0;z-index:5;display:none;pointer-events:none}
   #joy{position:absolute;left:22px;bottom:28px;width:128px;height:128px;border-radius:50%;background:#fff2;border:3px solid #fff8;pointer-events:auto;touch-action:none}
   #knob{position:absolute;left:40px;top:40px;width:48px;height:48px;border-radius:50%;background:#fff8}
-  #btn-sprint,#btn-hide{position:absolute;right:22px;width:108px;height:64px;border-radius:16px;border:3px solid #fff;background:#0007;color:#fff;font:800 16px Arial;pointer-events:auto}
+  #btn-sprint,#btn-hide,#btn-lasso{position:absolute;right:22px;width:108px;height:64px;border-radius:16px;border:3px solid #fff;background:#0007;color:#fff;font:800 16px Arial;pointer-events:auto}
+  #btn-lasso{bottom:192px}
   #btn-sprint{bottom:110px}
   #btn-hide{bottom:28px}
   #portrait{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;text-align:center;background:#071018;color:#ffe08a;font:800 24px Arial;padding:20px}
@@ -60,6 +61,7 @@
 <button id="hide-buttons" type="button">Hide buttons</button>
 <div id="touch">
   <div id="joy"><div id="knob"></div></div>
+  <button id="btn-lasso" type="button">LASSO</button>
   <button id="btn-sprint" type="button">SPRINT</button>
   <button id="btn-hide" type="button">HIDE</button>
 </div>
@@ -385,6 +387,7 @@ const KEYMAP = {
   ArrowUp: "up", KeyW: "up", ArrowDown: "down", KeyS: "down",
   ShiftLeft: "sprint", ShiftRight: "sprint",
   Space: "act", KeyE: "act", KeyX: "act",
+  KeyF: "lasso",
   KeyV: "fp", KeyP: "pause", KeyM: "mute", KeyH: "hidetoggle",
   Enter: "enter", NumpadEnter: "enter",
 };
@@ -422,26 +425,33 @@ function pollPad() {
     const list = navigator.getGamepads();
     for (let i = 0; i < list.length; i++) if (list[i] && list[i].connected) { pad = list[i]; break; }
   }
-  const dead = 0.28;
   const ax = pad && pad.axes ? pad.axes : [];
-  const lx = ax[0] || 0, ly = ax[1] || 0, rx = ax[2] || 0, ry = ax[3] || 0;
-  const left = (pad && padBtn(pad, 14)) || lx < -dead;
-  const right = (pad && padBtn(pad, 15)) || lx > dead;
-  const up = (pad && padBtn(pad, 12)) || ly < -dead;
-  const down = (pad && padBtn(pad, 13)) || ly > dead;
-  setHeld("pad", "left", !!left);
-  setHeld("pad", "right", !!right);
-  setHeld("pad", "up", !!up);
-  setHeld("pad", "down", !!down);
-  setHeld("pad", "act", !!(pad && (padBtn(pad, 0) || padBtn(pad, 2))));
-  setHeld("pad", "sprint", !!(pad && (padBtn(pad, 1) || padBtn(pad, 7))));
+  const move = radial(ax[0] || 0, ax[1] || 0, 0.15);
+  const look = radial(ax[2] || 0, ax[3] || 0, 0.15);
+  stickTarget.x = move.x;
+  stickTarget.y = move.y;
+  lookTarget.x = look.x;
+  lookTarget.y = look.y;
+  setHeld("pad", "left", !!(pad && padBtn(pad, 14)));
+  setHeld("pad", "right", !!(pad && padBtn(pad, 15)));
+  setHeld("pad", "up", !!(pad && padBtn(pad, 12)));
+  setHeld("pad", "down", !!(pad && padBtn(pad, 13)));
+  setHeld("pad", "act", !!(pad && padBtn(pad, 0)));
+  setHeld("pad", "lasso", !!(pad && (padBtn(pad, 2) || padBtn(pad, 5))));
+  setHeld("pad", "sprint", !!(pad && (padBtn(pad, 1) || padBtn(pad, 7) || (+window.__nativeR2 || 0) > 0.55)));
   setHeld("pad", "fp", !!(pad && padBtn(pad, 3)));
   setHeld("pad", "enter", !!(pad && (padBtn(pad, 9) || padBtn(pad, 0))));
   setHeld("pad", "pause", !!(pad && padBtn(pad, 9)));
   setHeld("pad", "hidetoggle", !!(pad && padBtn(pad, 8)));
-  lookStick.x = Math.abs(rx) > dead ? rx : 0;
-  lookStick.y = Math.abs(ry) > dead ? ry : 0;
+  setHeld("pad", "recenter", !!(pad && padBtn(pad, 11)));
   padConnected = !!pad;
+}
+
+function radial(x, y, dead) {
+  const m = Math.hypot(x, y);
+  if (m <= dead || m === 0) return { x: 0, y: 0 };
+  const scaled = Math.pow((m - dead) / (1 - dead), 1.35);
+  return { x: (x / m) * scaled, y: (y / m) * scaled };
 }
 
 let AC = null, muted = false, wind = null;
@@ -918,6 +928,13 @@ bubble.visible = false;
 scene.add(bubble);
 const bang = makeMark();
 scene.add(bang);
+const ropeBeads = [];
+for (let i = 0; i < 8; i++) {
+  const bead = new THREE.Mesh(new THREE.SphereGeometry(0.07, 6, 4), new THREE.MeshBasicMaterial({ color: 0xffe08a }));
+  bead.visible = false;
+  scene.add(bead);
+  ropeBeads.push(bead);
+}
 const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.45, 8), new THREE.MeshBasicMaterial({ color: 0xffe08a }));
 arrow.rotation.x = Math.PI / 2;
 scene.add(arrow);
@@ -997,7 +1014,11 @@ let lastLantern = { x: player.x, z: player.z };
 let hiding = false;
 let stamina = 1;
 let cameraYaw = 0;
-let cameraPitch = 0.2;
+let cameraPitch = 0.22;
+let heroYaw = 0;
+let orbitYaw = 0;
+let orbitPitch = 0.22;
+let lookIdle = 0;
 let fp = false;
 let cycleT = 8;
 let nightFactor = 0;
@@ -1030,7 +1051,15 @@ let fps = 0;
 let fpsFrames = 0;
 let fpsAcc = 0;
 let lookDX = 0, lookDY = 0;
-const lookStick = { x: 0, y: 0 };
+const stickTarget = { x: 0, y: 0 };
+const stickSm = { x: 0, y: 0 };
+const lookTarget = { x: 0, y: 0 };
+const lookSm = { x: 0, y: 0 };
+let lassoT = 0;
+let lassoCd = 0;
+let stunT = 0;
+let stunUsed = false;
+const pulls = [];
 let padConnected = false;
 let walkT = 0;
 let monsterWalk = 0;
@@ -1088,7 +1117,8 @@ function toggleButtons() {
 hideBtn.addEventListener("click", (e) => { e.stopPropagation(); audio(); toggleButtons(); });
 document.getElementById("btn-sprint").addEventListener("pointerdown", (e) => { e.preventDefault(); setHeld("touch", "sprint", true); });
 document.getElementById("btn-hide").addEventListener("pointerdown", (e) => { e.preventDefault(); audio(); setHeld("touch", "act", true); });
-window.addEventListener("pointerup", () => { setHeld("touch", "sprint", false); setHeld("touch", "act", false); });
+document.getElementById("btn-lasso").addEventListener("pointerdown", (e) => { e.preventDefault(); audio(); setHeld("touch", "lasso", true); });
+window.addEventListener("pointerup", () => { setHeld("touch", "sprint", false); setHeld("touch", "act", false); setHeld("touch", "lasso", false); });
 
 const joy = document.getElementById("joy");
 const knob = document.getElementById("knob");
@@ -1112,11 +1142,13 @@ function aimJoy(e) {
   setHeld("touch", "up", y < -0.3);
 }
 let lookPtr = null;
+let clickX = 0, clickY = 0, clickBtn = -1;
 renderer.domElement.addEventListener("pointerdown", (e) => {
   audio();
+  clickX = e.clientX; clickY = e.clientY; clickBtn = e.button;
   if (state === "title" || state === "win" || state === "dead") return;
   const r = view.getBoundingClientRect();
-  if (e.clientX > r.left + r.width * 0.45 && !e.target.closest("button")) {
+  if (e.button === 0 && e.clientX > r.left + r.width * 0.45 && !e.target.closest("button")) {
     lookPtr = e.pointerId;
   }
 });
@@ -1125,7 +1157,16 @@ window.addEventListener("pointermove", (e) => {
   lookDX += e.movementX || 0;
   lookDY += e.movementY || 0;
 });
-window.addEventListener("pointerup", (e) => { if (e.pointerId === lookPtr) lookPtr = null; });
+window.addEventListener("pointerup", (e) => {
+  if (e.pointerId === lookPtr) lookPtr = null;
+  if (e.button === 0 && clickBtn === 0 && state === "play" && !e.target.closest("button")) {
+    if (Math.hypot(e.clientX - clickX, e.clientY - clickY) < 10) {
+      setHeld("key", "lasso", true);
+      setHeld("key", "lasso", false);
+    }
+  }
+  clickBtn = -1;
+});
 let dragging = false;
 renderer.domElement.addEventListener("mousedown", () => { dragging = true; audio(); });
 window.addEventListener("mouseup", () => { dragging = false; });
@@ -1286,9 +1327,24 @@ function poseHero(dt, moving, hostile) {
     pos.needsUpdate = true;
   }
   const lasso = hero.userData.lasso;
-  if (lasso) lasso.rotation.z = Math.sin(performance.now() / 500) * 0.25;
+  if (lasso) {
+    if (lassoT > 0) {
+      const u = 1 - lassoT / 0.55;
+      const ang = -1.1 + u * 2.4;
+      lasso.position.set(Math.sin(ang) * 0.85, 1.2, 0.35 + Math.cos(ang) * 0.55);
+      lasso.rotation.set(1.1, ang, u * 6);
+      lasso.scale.setScalar(1.8);
+    } else {
+      lasso.position.set(0.46, 0.82, 0.22);
+      lasso.rotation.set(0.4, 0.4, Math.sin(performance.now() / 500) * 0.25);
+      lasso.scale.setScalar(1);
+    }
+  }
   const ll = hero.getObjectByName("lassoLight");
-  if (ll) ll.intensity = 0.25 + nightFactor * 2.1;
+  if (ll) {
+    ll.intensity = lassoT > 0 ? 3.2 : 0.25 + nightFactor * 2.1;
+    if (lasso) ll.position.copy(lasso.position);
+  }
   if (scaredNow && hostile) hero.position.y += Math.sin(performance.now() / 60) * 0.01;
 }
 
@@ -1306,7 +1362,7 @@ function poseMonster(dt, moving, hostile) {
   if (armL) armL.rotation.z = 0;
   if (armR) armR.rotation.z = 0;
   if (!hostile && mon.wave > 0 && armR) armR.rotation.x = -1.1 + Math.sin(performance.now() / 180) * 0.25;
-  if (head) head.rotation.set(0, 0, !hostile ? Math.sin(performance.now() / 500) * 0.06 : 0);
+  if (head) head.rotation.set(0, 0, stunT > 0 ? Math.sin(performance.now() / 50) * 0.25 : (!hostile ? Math.sin(performance.now() / 500) * 0.06 : 0));
   monster.position.set(mon.x, groundY(mon.x, mon.z) + Math.abs(Math.sin(monsterWalk)) * 0.05, mon.z);
   monster.rotation.y = mon.yaw;
 }
@@ -1337,6 +1393,15 @@ function startGame() {
   invuln = 0;
   surprises = 0;
   lastSurprise = -999;
+  heroYaw = cameraYaw;
+  orbitYaw = 0;
+  orbitPitch = 0.22;
+  lassoT = 0;
+  lassoCd = 0;
+  stunT = 0;
+  stunUsed = false;
+  pulls.length = 0;
+  ropeBeads.forEach((b) => { b.visible = false; });
   playTime = 0;
   talkT = 0;
   hintT = 0;
@@ -1352,6 +1417,7 @@ function startGame() {
   transformed = startAt === "night";
   topname.style.display = "none";
   showPanel(false);
+  hint("Lasso: F, click, RB, or X", 3600);
 }
 let doorAngle = 0;
 
@@ -1429,10 +1495,104 @@ function triggerSurprise() {
   beginScare("surprise");
 }
 
-function hint(text) {
+function hint(text, ms) {
   hintEl.style.display = "block";
   hintEl.textContent = text;
-  hintEl.dataset.until = String(performance.now() + 2200);
+  hintEl.dataset.until = String(performance.now() + (ms || 2200));
+}
+function damp(a, b, dt, rate) {
+  return a + (b - a) * (1 - Math.exp(-rate * dt));
+}
+function dampAngle(a, b, dt, rate) {
+  let d = b - a;
+  while (d > Math.PI) d -= Math.PI * 2;
+  while (d < -Math.PI) d += Math.PI * 2;
+  return a + d * (1 - Math.exp(-rate * dt));
+}
+function updateOrbit(dt) {
+  lookSm.x = damp(lookSm.x, lookTarget.x, dt, 18);
+  lookSm.y = damp(lookSm.y, lookTarget.y, dt, 18);
+  const looking = Math.hypot(lookTarget.x, lookTarget.y) > 0.04 || Math.abs(lookDX) + Math.abs(lookDY) > 0.4;
+  if (looking) lookIdle = 0;
+  else lookIdle += dt;
+  orbitYaw -= lookSm.x * dt * 3.2;
+  orbitYaw -= lookDX * 0.006;
+  orbitPitch = clamp(orbitPitch - lookSm.y * dt * 1.7 + lookDY * 0.0035, -0.15, 0.8);
+  lookDX = 0;
+  lookDY = 0;
+  if (pressed.recenter) {
+    orbitYaw = 0;
+    orbitPitch = 0.22;
+    lookIdle = 3;
+  }
+  if (!looking && lookIdle > 0.6) {
+    const k = 1 - Math.exp(-dt * 3.4);
+    orbitYaw *= 1 - k;
+    orbitPitch += (0.22 - orbitPitch) * k;
+  }
+}
+function tryLasso() {
+  if (state !== "play" || lassoCd > 0 || lassoT > 0) return;
+  lassoT = 0.55;
+  lassoCd = 0.85;
+  tone(660, 0.1, "triangle", 0.07, 990);
+  noiseBurst(0.12, 0.06, 400);
+  const fx = Math.sin(heroYaw), fz = Math.cos(heroYaw);
+  for (const l of lanterns) {
+    if (l.got || pulls.some((p) => p.lantern === l)) continue;
+    const dx = l.x - player.x, dz = l.z - player.z;
+    const d = Math.hypot(dx, dz);
+    if (d > 6 || d < 0.15) continue;
+    if ((dx * fx + dz * fz) / d < 0.4) continue;
+    pulls.push({ lantern: l, t: 0, x: l.x, z: l.z, y: l.mesh.position.y });
+  }
+  if (nightFactor > 0.55 && !stunUsed) {
+    const dx = mon.x - player.x, dz = mon.z - player.z;
+    const d = Math.hypot(dx, dz) || 0.001;
+    if (d < 6.5 && (dx * fx + dz * fz) / d > 0.25) {
+      stunT = 2;
+      stunUsed = true;
+      hint("The lasso stunned him!");
+      tone(160, 0.35, "sawtooth", 0.07, 50);
+    }
+  }
+}
+function showRope(ax, ay, az, bx, by, bz) {
+  for (let i = 0; i < ropeBeads.length; i++) {
+    const t = (i + 1) / (ropeBeads.length + 1);
+    const bead = ropeBeads[i];
+    bead.visible = true;
+    bead.position.set(ax + (bx - ax) * t, ay + (by - ay) * t + Math.sin(t * Math.PI) * 0.55, az + (bz - az) * t);
+  }
+}
+function updatePulls(dt, gy) {
+  for (let i = pulls.length - 1; i >= 0; i--) {
+    const p = pulls[i];
+    p.t += dt / 0.42;
+    const k = clamp(p.t, 0, 1);
+    const ease = k * k * (3 - 2 * k);
+    p.lantern.mesh.position.set(
+      p.x + (player.x - p.x) * ease,
+      p.y + (gy + 1.15 - p.y) * ease + Math.sin(k * Math.PI) * 1.35,
+      p.z + (player.z - p.z) * ease
+    );
+    if (k >= 1) {
+      p.lantern.got = true;
+      p.lantern.mesh.visible = false;
+      lastLantern = { x: player.x, z: player.z };
+      tone(660, 0.12, "triangle", 0.08, 1320);
+      hint("Lantern " + lanterns.filter((l) => l.got).length + " of 7");
+      pulls.splice(i, 1);
+    }
+  }
+  if (pulls.length) {
+    const p = pulls[0];
+    showRope(player.x, gy + 1.15, player.z, p.lantern.mesh.position.x, p.lantern.mesh.position.y, p.lantern.mesh.position.z);
+  } else if (lassoT > 0) {
+    const u = 1 - lassoT / 0.55;
+    const ang = heroYaw - 1.1 + u * 2.4;
+    showRope(player.x, gy + 1.1, player.z, player.x + Math.sin(ang) * 1.7, gy + 1.35, player.z + Math.cos(ang) * 1.7);
+  } else ropeBeads.forEach((b) => { b.visible = false; });
 }
 
 function showPanel(on) {
@@ -1449,7 +1609,7 @@ function refreshPanel() {
   if (state === "title") {
     heading.textContent = "";
     blurb.textContent = "You are the Hero, lost in the woods. Collect 7 lanterns and reach the gate. The monster is friendly by day.";
-    help.innerHTML = "Move WASD or sticks. Look with the mouse, right stick, or a swipe. Sprint Shift or B. Pick up, hide, or talk with E, Space, or A. First person: V or Y.";
+    help.innerHTML = "Move with the left stick, D-pad, or WASD. The right stick looks around; it eases back behind you, and R3 recenters. Sprint is Shift or B. Swing the lasso with F, a left click, RB, or X. Hide, talk, or pick up with E, Space, or A. First person: V or Y.";
     prompt.textContent = isTouch ? "Tap to start" : "Press ENTER or A";
     drawOpts();
   } else if (state === "pause") {
@@ -1502,21 +1662,35 @@ function updatePlay(dt) {
   if (pressed.fp) fp = !fp;
   if (pressed.pause) { state = "pause"; showPanel(true); refreshPanel(); return; }
   if (pressed.act) interact();
+  if (pressed.lasso) tryLasso();
+  lassoCd = Math.max(0, lassoCd - dt);
+  if (lassoT > 0) lassoT = Math.max(0, lassoT - dt);
+  if (!hostile) { stunUsed = false; stunT = 0; }
+  else stunT = Math.max(0, stunT - dt);
   if (!inBush(player.x, player.z)) hiding = false;
-  const mx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
-  const mz = (keys.up ? 1 : 0) - (keys.down ? 1 : 0);
-  let moving = Math.hypot(mx, mz) > 0.1;
+  stickSm.x = damp(stickSm.x, stickTarget.x, dt, 16);
+  stickSm.y = damp(stickSm.y, stickTarget.y, dt, 16);
+  let ix = stickSm.x + ((keys.right ? 1 : 0) - (keys.left ? 1 : 0));
+  let iy = -stickSm.y + ((keys.up ? 1 : 0) - (keys.down ? 1 : 0));
+  let moveMag = Math.hypot(ix, iy);
+  if (moveMag > 1) { ix /= moveMag; iy /= moveMag; moveMag = 1; }
+  const moving = moveMag > 0.08;
   const sprinting = !!(keys.sprint && moving && stamina > 0.02 && !hiding);
   if (sprinting) stamina = Math.max(0, stamina - dt / 3.2);
   else stamina = Math.min(1, stamina + dt / 2.4);
   const speed = hiding ? 1.4 : (sprinting ? 8.1 : 4.5);
+  const len = Math.min(1, moveMag);
   if (moving) {
-    const len = Math.hypot(mx, mz);
-    const fx = Math.sin(cameraYaw), fz = Math.cos(cameraYaw);
-    const rx = Math.cos(cameraYaw), rz = -Math.sin(cameraYaw);
-    player.x += (fx * (mz / len) + rx * (mx / len)) * speed * dt;
-    player.z += (fz * (mz / len) + rz * (mx / len)) * speed * dt;
-    walkT += dt * (sprinting ? 14 : 9);
+    const nx = ix / moveMag, ny = iy / moveMag;
+    const camFace = heroYaw + orbitYaw;
+    const fx = Math.sin(camFace), fz = Math.cos(camFace);
+    const rx = Math.cos(camFace), rz = -Math.sin(camFace);
+    const wdx = fx * ny + rx * nx;
+    const wdz = fz * ny + rz * nx;
+    player.x += wdx * speed * len * dt;
+    player.z += wdz * speed * len * dt;
+    heroYaw = dampAngle(heroYaw, Math.atan2(wdx, wdz), dt, 14);
+    walkT += dt * (sprinting ? 14 : 9) * (0.45 + len);
     stepT -= dt;
     if (stepT <= 0) { noiseBurst(0.05, 0.04, 180); stepT = sprinting ? 0.22 : 0.38; }
   }
@@ -1525,8 +1699,7 @@ function updatePlay(dt) {
   const gy = groundY(player.x, player.z);
   hero.position.set(player.x, gy + player.hop - (hiding ? 0.62 : 0), player.z);
   hero.visible = !fp;
-  const faceYaw = moving ? Math.atan2(mx, mz) + cameraYaw : cameraYaw;
-  hero.rotation.y = faceYaw;
+  hero.rotation.y = heroYaw;
   poseHero(dt, moving, hostile);
 
   const md = Math.hypot(mon.x - player.x, mon.z - player.z);
@@ -1554,7 +1727,8 @@ function updatePlay(dt) {
     mxv = mon.tx - mon.x; mzv = mon.tz - mon.z;
   }
   const mlen = Math.hypot(mxv, mzv) || 1;
-  const mspeed = mon.mode === "chase" ? 6.0 : (mon.mode === "flee" ? 7.2 : 2.3);
+  let mspeed = mon.mode === "chase" ? 6.0 : (mon.mode === "flee" ? 7.2 : 2.3);
+  if (stunT > 0) mspeed = 0;
   if (state === "play") {
     mon.x += (mxv / mlen) * mspeed * dt;
     mon.z += (mzv / mlen) * mspeed * dt;
@@ -1566,7 +1740,7 @@ function updatePlay(dt) {
   if (talkT > 0 && !hostile) mon.yaw = Math.atan2(player.x - mon.x, player.z - mon.z);
   poseMonster(dt, mlen > 0.2, hostile);
   if (!hostile && md < 3.6) { /* ready to talk */ }
-  if (hostile && !hiding && invuln <= 0 && md < 1.55 && mon.mode === "chase") beginScare("catch");
+  if (stunT <= 0 && hostile && !hiding && invuln <= 0 && md < 1.55 && mon.mode === "chase") beginScare("catch");
 
   talkT = Math.max(0, talkT - dt);
   hintT = Math.max(0, hintT - dt);
@@ -1591,8 +1765,9 @@ function updatePlay(dt) {
     setTimeout(() => tone(784, 0.25, "triangle", 0.08), 240);
     showPanel(true); refreshPanel();
   }
+  updatePulls(dt, gy);
   lanterns.forEach((l) => {
-    if (l.got) return;
+    if (l.got || pulls.some((p) => p.lantern === l)) return;
     l.mesh.position.y = l.baseY + Math.sin(performance.now() / 380 + l.x) * 0.12;
     l.mesh.rotation.y += dt;
   });
@@ -1625,10 +1800,9 @@ function updatePlay(dt) {
     vignette.style.opacity = String(clamp(1 - md / 16, 0, 0.85));
   } else vignette.style.opacity = "0";
 
-  cameraYaw -= lookStick.x * dt * 2.4;
-  cameraPitch = clamp(cameraPitch - lookStick.y * dt * 1.4 + lookDY * 0.003, -0.35, 0.7);
-  cameraYaw -= lookDX * 0.005;
-  lookDX = 0; lookDY = 0;
+  updateOrbit(dt);
+  cameraYaw = heroYaw + orbitYaw;
+  cameraPitch = orbitPitch;
   placeCamera(hostile, md);
   playerLight.position.set(player.x + Math.sin(cameraYaw) * 0.8, gy + 1.5, player.z + Math.cos(cameraYaw) * 0.8);
 }
@@ -1898,7 +2072,11 @@ window.__game = {
   get monsterFace() { return monster.userData.faces.night.visible ? "night" : "day"; },
   get scareHeadOn() { return scareHead.visible; },
   get cameraYaw() { return cameraYaw; },
-  set cameraYaw(v) { cameraYaw = v; },
+  set cameraYaw(v) { heroYaw = v; orbitYaw = 0; cameraYaw = v; },
+  get orbitYaw() { return orbitYaw; },
+  get lassoT() { return lassoT; },
+  get stunT() { return stunT; },
+  get stickMag() { return Math.hypot(stickSm.x, stickSm.y); },
   cameraPos() { return { x: camera.position.x, y: camera.position.y, z: camera.position.z }; },
   heroParts() {
     hero.updateWorldMatrix(true, true);

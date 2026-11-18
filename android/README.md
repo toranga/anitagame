@@ -20,7 +20,15 @@ export ANDROID_HOME="$HOME/android-sdk"
 cp app/build/outputs/apk/release/app-release.apk ../DontDie.apk
 ```
 
-The build copies `../index.html` and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.2 (versionCode 3) is 1.9 MB (2,033,519 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
+The build copies `../index.html` and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.3 (versionCode 4) is 2.0 MB (2,048,849 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
+
+To release an update:
+
+1. Bump `versionCode` (and `versionName`) in `app/build.gradle.kts`.
+2. Build the release APK and copy it to `DontDie.apk` at the repository root.
+3. Set the same `versionCode`, `versionName`, APK URL, and notes in `version.json` at the repository root.
+
+The app fetches `https://toranga.github.io/anitagame/version.json` on launch and from **Check for updates**. A higher `versionCode` offers Update now / Later, downloads the APK, and opens the installer.
 
 Check the TV launcher bits:
 
@@ -32,18 +40,21 @@ You should see `android.software.leanback` not required, touchscreen not require
 
 ## Controller
 
-The page is opened with `?native=1`, which sets `window.__nativePad`. The game then ignores `navigator.getGamepads()` and reads `window.__nativeButtons` and `window.__nativeAxis` instead, so a press is not applied twice.
+The page is opened with `?native=1`, which sets `window.__nativePad`. The game then ignores `navigator.getGamepads()` and reads the values the activity writes each frame: both sticks (`__nativeAxis` / `__nativeAxisY` and `__nativeRightX` / `__nativeRightY`, from `AXIS_X`/`AXIS_Y` and `AXIS_Z`/`AXIS_RZ`), both triggers (`__nativeL2` / `__nativeR2`), and `__nativeButtons`.
 
-| Control | Action |
-| --- | --- |
-| Left stick or D-pad left/right | Run |
-| A or D-pad up | Jump. A also starts the game |
-| B or Y | Laser |
-| X | Talk |
-| R1 or R2 | Fly while held |
-| Start or D-pad center | Start, restart, or pause |
-| Select | Hide or show the on-screen buttons |
-| Back | Pause. Press Back again within 2 seconds to quit |
-| Home | Leaves the app, handled by Android |
+| Control | DON'T DIE | SPOOKY FOREST |
+| --- | --- | --- |
+| Left stick or D-pad | Run | Move, relative to the camera |
+| Right stick | | Orbit the camera. It eases back behind the Hero. R3 recenters |
+| A | Jump, and start the game | Hide, talk, or pick up. A also starts |
+| B | Laser | Sprint |
+| X | Talk | Swing the lasso |
+| Y | Laser | First person |
+| RB | Fly while held | Swing the lasso |
+| RT | Fly while held | Sprint |
+| Start | Start, restart, or pause | Start or pause |
+| Select | Hide or show the on-screen buttons | Hide or show the on-screen buttons |
+| Back | Pause. Press Back again within 2 seconds to quit | Pause. Press Back again within 2 seconds to quit |
+| Home | Leaves the app, handled by Android | Leaves the app, handled by Android |
 
 B is `KEYCODE_BUTTON_B`. It is consumed by the activity, so the WebView cannot treat it as Back.

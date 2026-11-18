@@ -15,9 +15,12 @@ object GamepadMap {
     const val X = 2
     const val Y = 3
     const val R1 = 5
+    const val L2 = 6
     const val R2 = 7
     const val SELECT = 8
     const val START = 9
+    const val L3 = 10
+    const val R3 = 11
     const val DPAD_UP = 12
     const val DPAD_DOWN = 13
     const val DPAD_LEFT = 14
@@ -34,7 +37,10 @@ object GamepadMap {
         KeyEvent.KEYCODE_BUTTON_Y -> Y
         KeyEvent.KEYCODE_BUTTON_X -> X
         KeyEvent.KEYCODE_BUTTON_R1 -> R1
+        KeyEvent.KEYCODE_BUTTON_L2 -> L2
         KeyEvent.KEYCODE_BUTTON_R2 -> R2
+        KeyEvent.KEYCODE_BUTTON_THUMBL -> L3
+        KeyEvent.KEYCODE_BUTTON_THUMBR -> R3
         KeyEvent.KEYCODE_BUTTON_START,
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER,

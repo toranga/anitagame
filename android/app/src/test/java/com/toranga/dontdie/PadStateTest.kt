@@ -52,6 +52,8 @@ class PadStateTest {
         assertEquals(GamepadMap.DPAD_LEFT, GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_LEFT))
         assertEquals(GamepadMap.DPAD_RIGHT, GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_RIGHT))
         assertEquals(GamepadMap.DPAD_DOWN, GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_DOWN))
+        assertEquals(GamepadMap.R3, GamepadMap.buttonIndex(KeyEvent.KEYCODE_BUTTON_THUMBR))
+        assertEquals(GamepadMap.L2, GamepadMap.buttonIndex(KeyEvent.KEYCODE_BUTTON_L2))
         assertTrue(GamepadMap.shouldConsume(KeyEvent.KEYCODE_DPAD_DOWN))
         assertFalse(GamepadMap.shouldConsume(KeyEvent.KEYCODE_HOME))
     }
@@ -62,6 +64,14 @@ class PadStateTest {
         pad.onAxes(0.2f, -1f, -1f, 0.8f)
         val (js, _) = pad.toJavascript()
         assertTrue(js.contains("window.__nativeAxis=0.2000"))
+        val sticks = PadState()
+        sticks.onAxes(0f, 0f, 0f, 0.4f, -0.2f, 0.55f, -0.3f, 0.1f)
+        val (axes, _) = sticks.toJavascript()
+        assertTrue(axes.contains("window.__nativeAxisY=-0.2000"))
+        assertTrue(axes.contains("window.__nativeRightX=0.5500"))
+        assertTrue(axes.contains("window.__nativeRightY=-0.3000"))
+        assertTrue(axes.contains("window.__nativeL2=0.1000"))
+        assertTrue(axes.contains("window.__nativeR2=0.4000"))
         assertEquals(setOf(GamepadMap.DPAD_LEFT, GamepadMap.DPAD_UP, GamepadMap.R2), downs(js).toSet())
     }
 
