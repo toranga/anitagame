@@ -51,7 +51,7 @@ class PadStateTest {
         assertEquals(GamepadMap.SELECT, GamepadMap.buttonIndex(KeyEvent.KEYCODE_BUTTON_SELECT))
         assertEquals(GamepadMap.DPAD_LEFT, GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_LEFT))
         assertEquals(GamepadMap.DPAD_RIGHT, GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_RIGHT))
-        assertNull(GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_DOWN))
+        assertEquals(GamepadMap.DPAD_DOWN, GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_DOWN))
         assertTrue(GamepadMap.shouldConsume(KeyEvent.KEYCODE_DPAD_DOWN))
         assertFalse(GamepadMap.shouldConsume(KeyEvent.KEYCODE_HOME))
     }

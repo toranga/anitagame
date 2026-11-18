@@ -4,6 +4,8 @@
 
 A platformer designed by a kid. The caped kid is the hero.
 
+Her other game is [SPOOKY FOREST](forest/index.html). You play as the Hero, collecting lanterns in a 3D forest. The red monster is friendly by day and scary at night.
+
 ![DON'T DIE poster](poster.jpg)
 
 ## How to play
@@ -45,14 +47,15 @@ On the title screen, a connected controller changes the prompt to "Press A or ST
 
 ## Play on NVIDIA Shield
 
-The browser on Android TV turns the D-pad into a mouse and treats B as Back. The native app sends those buttons to the game instead. It is landscape, fullscreen, and works offline. The download is 1.8 MB (1,837,731 bytes).
+The browser on Android TV turns the D-pad into a mouse and treats B as Back. The native app sends those buttons to the game instead. It is landscape, fullscreen, and works offline. The download is 1.9 MB (2,033,519 bytes).
 
 1. On the Shield, install the free **Downloader** app by AFTVnews from the Play Store.
 2. Allow Downloader to install unknown apps when Android asks (or in Settings, Apps, Downloader, Install unknown apps).
 3. In Downloader, enter `https://toranga.github.io/anitagame/DontDie.apk` and download it.
-4. Install the APK, then launch **DON'T DIE** from the apps row.
+4. Install the APK. If you already have the app, this build is an update (versionCode 3) signed with the same debug key.
+5. Launch **Anita's Games**, then choose DON'T DIE or SPOOKY FOREST.
 
-Pair the controller under Settings, Remotes & accessories. Press A or START to play. B fires the laser and does not leave the app. Press Back to pause; press Back again within 2 seconds to quit.
+Pair the controller under Settings, Remotes & accessories. In DON'T DIE, A or START plays and B fires the laser. In SPOOKY FOREST, the left stick moves, the right stick looks, A talks or hides, and B sprints. Press Back to pause; press Back again within 2 seconds to quit.
 
 The page at https://toranga.github.io/anitagame/ is the same game in a browser, for a keyboard, a phone, or a computer.
 

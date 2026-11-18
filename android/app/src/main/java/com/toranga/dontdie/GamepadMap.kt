@@ -19,6 +19,7 @@ object GamepadMap {
     const val SELECT = 8
     const val START = 9
     const val DPAD_UP = 12
+    const val DPAD_DOWN = 13
     const val DPAD_LEFT = 14
     const val DPAD_RIGHT = 15
 
@@ -41,6 +42,7 @@ object GamepadMap {
         KeyEvent.KEYCODE_BUTTON_SELECT -> SELECT
         KeyEvent.KEYCODE_DPAD_LEFT -> DPAD_LEFT
         KeyEvent.KEYCODE_DPAD_RIGHT -> DPAD_RIGHT
+        KeyEvent.KEYCODE_DPAD_DOWN -> DPAD_DOWN
         else -> null
     }
 

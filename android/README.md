@@ -1,6 +1,6 @@
 # DON'T DIE for Android TV
 
-A fullscreen landscape app for NVIDIA Shield. It loads the same `index.html` as the website, bundled inside the APK, and forwards the controller into the game. The D-pad runs and jumps. B fires the laser and does not go back.
+A fullscreen landscape app for NVIDIA Shield. It opens a picker for DON'T DIE and SPOOKY FOREST, both bundled offline, and forwards the controller into the page. Back pauses, and a second Back within 2 seconds quits.
 
 ## What you need
 
@@ -20,7 +20,7 @@ export ANDROID_HOME="$HOME/android-sdk"
 cp app/build/outputs/apk/release/app-release.apk ../DontDie.apk
 ```
 
-The game HTML is copied from `../index.html` at build time, so the APK stays in step with the website. Copy the finished APK to `DontDie.apk` at the repository root. The current sideload build is 1.8 MB (1,837,731 bytes).
+The build copies `../index.html` and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.2 (versionCode 3) is 1.9 MB (2,033,519 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
 
 Check the TV launcher bits:
 
