@@ -20,7 +20,7 @@ export ANDROID_HOME="$HOME/android-sdk"
 cp app/build/outputs/apk/release/app-release.apk ../DontDie.apk
 ```
 
-The build copies `../index.html` and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.1 (versionCode 2) is 1.9 MB (2,030,936 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
+The build copies `../index.html` and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.2 (versionCode 3) is 1.9 MB (2,033,519 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
 
 Check the TV launcher bits:
 

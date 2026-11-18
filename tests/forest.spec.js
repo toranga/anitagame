@@ -96,14 +96,20 @@ test('play, collect, hide, talk, scare, and win', async ({ browser }) => {
     window.__game.setPhase('day');
     window.__game.cameraYaw = 0;
     window.__game.player.x = 0;
-    window.__game.player.z = 30;
-    window.__game.monster.x = 1.4;
-    window.__game.monster.z = 32.6;
+    window.__game.player.z = 5;
+    window.__game.monster.x = 1.5;
+    window.__game.monster.z = 7.6;
     window.__game.monster.mode = 'wander';
   });
   await page.keyboard.press('e');
   await page.waitForFunction(() => window.__game.talkT > 0);
   await page.waitForTimeout(250);
+  const bubble = await page.locator('#speech').boundingBox();
+  expect(bubble).toBeTruthy();
+  expect(bubble.x).toBeGreaterThanOrEqual(0);
+  expect(bubble.y).toBeGreaterThanOrEqual(0);
+  expect(bubble.x + bubble.width).toBeLessThanOrEqual(1280);
+  expect(bubble.y + bubble.height).toBeLessThanOrEqual(720);
   await page.screenshot({ path: path.join(ARTIFACTS, 'forest-day.png') });
 
   await page.evaluate(() => window.__game.setPhase('dusk'));
@@ -114,13 +120,24 @@ test('play, collect, hide, talk, scare, and win', async ({ browser }) => {
     window.__game.setPhase('night');
     window.__game.cameraYaw = 0;
     window.__game.player.x = 0;
-    window.__game.player.z = 40;
-    window.__game.monster.x = -2.4;
-    window.__game.monster.z = 43.2;
+    window.__game.player.z = 6;
+    window.__game.monster.x = -4.5;
+    window.__game.monster.z = 9.5;
     window.__game.monster.mode = 'chase';
   });
   await page.waitForFunction(() => window.__game.expression === 'scared' || window.__game.expression === 'terrified');
   await page.waitForTimeout(350);
+  const chase = await page.evaluate(() => ({
+    face: window.__game.monsterFace,
+    parts: window.__game.heroParts(),
+  }));
+  expect(chase.face).toBe('night');
+  expect(Math.abs(chase.parts.rx)).toBeLessThan(0.08);
+  expect(Math.abs(chase.parts.rz)).toBeLessThan(0.08);
+  expect(Math.hypot(chase.parts.hx - chase.parts.px, chase.parts.hz - chase.parts.pz)).toBeLessThan(0.4);
+  expect(Math.abs((chase.parts.hy - chase.parts.py) - 1.62)).toBeLessThan(0.2);
+  expect(chase.parts.ty).toBeGreaterThan(chase.parts.py + 1.5);
+  expect(chase.parts.ty).toBeLessThan(chase.parts.hy + 0.45);
   await page.screenshot({ path: path.join(ARTIFACTS, 'forest-chase.png') });
 
   await page.evaluate(() => {
@@ -131,10 +148,31 @@ test('play, collect, hide, talk, scare, and win', async ({ browser }) => {
     window.__game.monster.mode = 'chase';
   });
   await page.waitForFunction(() => window.__game.state === 'scare');
-  await page.waitForFunction(() => window.__game.scareT > 0.45);
+  await page.waitForFunction(() => window.__game.scareT > 0.45 && window.__game.scareHeadOn);
+  const flashOp = await page.locator('#flash').evaluate((el) => Number(getComputedStyle(el).opacity));
+  expect(flashOp).toBeLessThan(0.05);
   await page.screenshot({ path: path.join(ARTIFACTS, 'forest-jumpscare.png') });
   await page.waitForFunction(() => window.__game.state === 'play');
   expect(await page.evaluate(() => window.__game.lives)).toBe(2);
+
+  const tree = await page.evaluate(() => {
+    const c = window.__game.canopies[0];
+    window.__game.setPhase('day');
+    window.__game.monster.x = 80;
+    window.__game.monster.z = 80;
+    window.__game.monster.mode = 'wander';
+    window.__game.player.x = c.x;
+    window.__game.player.z = c.z + 1.3;
+    window.__game.cameraYaw = 0;
+    return { x: c.x, z: c.z };
+  });
+  await page.waitForTimeout(250);
+  const cam = await page.evaluate(() => {
+    const p = window.__game.cameraPos();
+    return { cam: p, pz: window.__game.player.z };
+  });
+  expect(cam.cam.z).toBeGreaterThan(tree.z - 0.15);
+  expect(Math.hypot(cam.cam.x - tree.x, cam.cam.z - cam.pz)).toBeLessThan(4.2);
 
   await page.evaluate(() => {
     window.__game.lanterns.forEach((l) => { l.got = true; l.mesh.visible = false; });

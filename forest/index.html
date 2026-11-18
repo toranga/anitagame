@@ -41,6 +41,7 @@
   #btn-hide{bottom:28px}
   #portrait{position:fixed;inset:0;z-index:8;display:none;align-items:center;justify-content:center;text-align:center;background:#071018;color:#ffe08a;font:800 24px Arial;padding:20px}
   #boot-error{position:fixed;inset:0;z-index:9;display:none;align-items:center;justify-content:center;color:#fff;background:#300;padding:24px;font:16px monospace}
+  #speech{position:fixed;z-index:20;display:none;max-width:min(280px,68vw);background:#fff;color:#2a1030;padding:10px 14px;border-radius:16px;font:700 16px/1.3 Arial,sans-serif;text-align:center;transform:translate(-50%,-120%);pointer-events:none;box-shadow:0 6px 16px #0006}
 </style>
 </head>
 <body>
@@ -72,6 +73,7 @@
   </div>
 </div>
 <div id="portrait">Turn your phone sideways<br><small>SPOOKY FOREST plays in landscape</small></div>
+<div id="speech"></div>
 <div id="boot-error"></div>
 <script type="importmap">
 { "imports": { "three": "./vendor/three.module.min.js" } }
@@ -111,45 +113,48 @@ function paintFace(kind) {
   g.clearRect(0, 0, 256, 256);
   const eye = (x, y, s, pupil) => {
     g.fillStyle = "#fff";
-    g.beginPath(); g.ellipse(x, y, 28 * s, 34 * s, 0, 0, 7); g.fill();
-    g.fillStyle = "#4a2a16";
-    g.beginPath(); g.arc(x, y + 2, 16 * s, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(x, y, 44 * s, 50 * s, 0, 0, 7); g.fill();
+    g.fillStyle = "#6b3a1e";
+    g.beginPath(); g.arc(x, y + 1, 32 * s, 0, 7); g.fill();
     g.fillStyle = "#1a0c08";
-    g.beginPath(); g.arc(x, y + 3, pupil, 0, 7); g.fill();
+    g.beginPath(); g.arc(x, y + 2, pupil, 0, 7); g.fill();
     g.fillStyle = "#fff";
-    g.beginPath(); g.arc(x - 6, y - 8, 6 * s, 0, 7); g.fill();
+    g.beginPath(); g.arc(x - 10, y - 12, 8 * s, 0, 7); g.fill();
   };
   const brow = (x, y, tilt) => {
-    g.strokeStyle = "#3a2418"; g.lineWidth = 7; g.lineCap = "round";
-    g.beginPath(); g.moveTo(x - 26, y); g.quadraticCurveTo(x, y + tilt, x + 26, y); g.stroke();
+    g.strokeStyle = "#3a2418"; g.lineWidth = 10; g.lineCap = "round";
+    g.beginPath(); g.moveTo(x - 40, y); g.quadraticCurveTo(x, y + tilt, x + 40, y); g.stroke();
   };
   if (kind === "happy") {
-    eye(78, 108, 1, 8); eye(178, 108, 1, 8);
-    brow(78, 68, 8); brow(178, 68, 8);
-    g.fillStyle = "#ffb0b8"; g.globalAlpha = 0.45;
-    g.beginPath(); g.arc(58, 150, 16, 0, 7); g.arc(198, 150, 16, 0, 7); g.fill();
-    g.globalAlpha = 1; g.fillStyle = "#fff";
-    g.beginPath(); g.ellipse(128, 176, 36, 22, 0, 0, Math.PI); g.fill();
-    g.fillStyle = "#e07070";
-    g.beginPath(); g.ellipse(128, 168, 38, 14, 0, 0, Math.PI, true); g.fill();
+    eye(72, 118, 1.15, 12); eye(184, 118, 1.15, 12);
+    brow(72, 52, 16); brow(184, 52, 16);
+    g.fillStyle = "#ffb0b8"; g.globalAlpha = 0.55;
+    g.beginPath(); g.arc(40, 158, 22, 0, 7); g.arc(216, 158, 22, 0, 7); g.fill();
+    g.globalAlpha = 1;
+    g.fillStyle = "#c45252";
+    g.beginPath(); g.ellipse(128, 176, 48, 26, 0, 0.08, Math.PI - 0.08); g.fill();
+    g.fillStyle = "#fff";
+    g.beginPath(); g.ellipse(128, 184, 34, 16, 0, 0, Math.PI); g.fill();
   } else if (kind === "scared") {
-    eye(78, 100, 1.25, 5); eye(178, 100, 1.25, 5);
-    brow(78, 52, -14); brow(178, 52, -14);
-    g.strokeStyle = "#6a3018"; g.lineWidth = 8;
-    g.beginPath(); g.arc(128, 186, 14, 0, 7); g.stroke();
-    g.fillStyle = "#7ec8ff";
-    g.beginPath(); g.ellipse(214, 78, 10, 16, 0.4, 0, 7); g.fill();
-  } else if (kind === "peek") {
-    eye(78, 150, 1.35, 6); eye(178, 150, 1.35, 6);
-    brow(78, 108, -10); brow(178, 108, -10);
-  } else {
-    eye(78, 96, 1.45, 4); eye(178, 96, 1.45, 4);
-    brow(78, 42, -18); brow(178, 42, -18);
+    eye(68, 108, 1.32, 7); eye(188, 108, 1.32, 7);
+    brow(68, 46, -26); brow(188, 46, -26);
     g.fillStyle = "#2a120c";
-    g.beginPath(); g.ellipse(128, 190, 18, 26, 0, 0, 7); g.fill();
-    g.fillStyle = "#7ec8ff";
-    g.beginPath(); g.ellipse(210, 70, 12, 18, 0.5, 0, 7); g.fill();
-    g.beginPath(); g.ellipse(46, 78, 10, 14, -0.4, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(128, 186, 16, 22, 0, 0, 7); g.fill();
+    g.fillStyle = "#8fd4ff";
+    g.beginPath(); g.ellipse(214, 58, 10, 18, 0.4, 0, 7); g.fill();
+  } else if (kind === "peek") {
+    g.fillStyle = "rgba(198,134,66,0.92)";
+    g.fillRect(0, 0, 256, 118);
+    eye(74, 150, 1.35, 7); eye(182, 150, 1.35, 7);
+    brow(74, 96, -18); brow(182, 96, -18);
+  } else {
+    eye(68, 90, 1.42, 5); eye(188, 90, 1.42, 5);
+    brow(68, 18, -32); brow(188, 18, -32);
+    g.fillStyle = "#1a0c08";
+    g.beginPath(); g.ellipse(128, 188, 22, 30, 0, 0, 7); g.fill();
+    g.fillStyle = "#8fd4ff";
+    g.beginPath(); g.ellipse(220, 52, 12, 18, 0.4, 0, 7); g.fill();
+    g.beginPath(); g.ellipse(36, 64, 10, 16, -0.4, 0, 7); g.fill();
   }
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -213,13 +218,15 @@ function buildHero() {
   torso.position.y = 1.05;
   torso.scale.set(1.25, 1, 0.82);
   g.add(torso);
-  const chest = new THREE.Mesh(new THREE.TorusGeometry(0.2, 0.035, 8, 16, Math.PI * 1.15), gold);
-  chest.rotation.x = Math.PI / 2.4;
-  chest.rotation.z = Math.PI;
-  chest.position.set(0, 1.22, 0.12);
-  torso.add(chest);
-  const star = new THREE.Mesh(starGeo(0.09, 0.04), lambert(0xd0122a));
-  star.position.set(0, 1.16, 0.26);
+  const chevL = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.04), gold);
+  chevL.position.set(-0.1, 1.18, 0.22);
+  chevL.rotation.z = 0.7;
+  const chevR = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.045, 0.04), gold);
+  chevR.position.set(0.1, 1.18, 0.22);
+  chevR.rotation.z = -0.7;
+  g.add(chevL, chevR);
+  const star = new THREE.Mesh(starGeo(0.07, 0.03), lambert(0xd0122a));
+  star.position.set(0, 1.12, 0.28);
   g.add(star);
 
   const skirt = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.5, 0.32, 16, 1, true), lambert(0xffffff, { map: skirtTexture(), side: THREE.DoubleSide }));
@@ -237,9 +244,10 @@ function buildHero() {
   const skull = new THREE.Mesh(new THREE.SphereGeometry(0.32, 20, 16), skin);
   skull.scale.set(1, 1.05, 0.96);
   head.add(skull);
-  const face = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.52), new THREE.MeshBasicMaterial({ map: paintFace("happy"), transparent: true }));
+  const faceMat = new THREE.MeshBasicMaterial({ map: paintFace("happy"), transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+  const face = new THREE.Mesh(new THREE.SphereGeometry(0.336, 24, 16, Math.PI / 2 - 0.72, 1.44, 1.05, 1.05), faceMat);
   face.name = "face";
-  face.position.set(0, -0.02, 0.3);
+  face.scale.set(1, 1.05, 0.96);
   head.add(face);
   const hair = new THREE.Group();
   hair.name = "hair";
@@ -247,18 +255,19 @@ function buildHero() {
     const m = new THREE.Mesh(new THREE.SphereGeometry(0.22, 14, 10), hairM);
     m.position.set(x, y, z); m.scale.set(sx, sy, sz); hair.add(m);
   };
-  puff(0, 0.02, -0.14, 1.35, 0.62, 1.15);
-  puff(-0.22, -0.05, 0.02, 0.7, 1.1, 0.7);
-  puff(0.22, -0.05, 0.02, 0.7, 1.1, 0.7);
-  puff(0, -0.28, -0.16, 0.85, 1.35, 0.7);
+  puff(0, 0.08, -0.2, 1.35, 0.5, 1.05);
+  puff(-0.26, -0.06, -0.04, 0.62, 1.15, 0.7);
+  puff(0.26, -0.06, -0.04, 0.62, 1.15, 0.7);
+  puff(0, -0.34, -0.22, 0.8, 1.45, 0.65);
   head.add(hair);
-  const tiara = new THREE.Mesh(new THREE.TorusGeometry(0.28, 0.045, 8, 24, Math.PI), gold);
-  tiara.rotation.x = Math.PI / 2.05;
-  tiara.position.set(0, 0.06, 0.14);
+  const tiara = new THREE.Mesh(new THREE.TorusGeometry(0.155, 0.022, 6, 16, Math.PI), gold);
+  tiara.name = "tiara";
+  tiara.rotation.x = 0.42;
+  tiara.position.set(0, 0.07, 0.2);
+  tiara.renderOrder = 3;
   head.add(tiara);
-  const gem = new THREE.Mesh(starGeo(0.1, 0.045), lambert(0xd0122a));
-  gem.scale.set(1.3, 1.3, 1);
-  gem.position.set(0, 0.14, 0.34);
+  const gem = new THREE.Mesh(starGeo(0.055, 0.024), lambert(0xd0122a));
+  gem.position.set(0, 0.2, 0.3);
   head.add(gem);
 
   function limb(name, x, y, len, rad, mat) {
@@ -514,7 +523,9 @@ renderer.outputColorSpace = THREE.SRGBColorSpace;
 view.appendChild(renderer.domElement);
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x9ec8ff, 0.014);
-const camera = new THREE.PerspectiveCamera(52, 1, 0.08, 180);
+const camera = new THREE.PerspectiveCamera(52, 1, 0.04, 180);
+scene.add(camera);
+const _camV = new THREE.Vector3();
 const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x3a5a28, 0.7);
 scene.add(hemi);
 const sun = new THREE.DirectionalLight(0xfff1cc, 1.2);
@@ -522,6 +533,8 @@ sun.position.set(30, 40, 18);
 scene.add(sun);
 const playerLight = new THREE.PointLight(0xffe0b0, 0, 14, 1.4);
 scene.add(playerLight);
+const scareLight = new THREE.PointLight(0xfff6e8, 0, 8, 1.2);
+scene.add(scareLight);
 const amb = new THREE.AmbientLight(0xffffff, 0.35);
 scene.add(amb);
 
@@ -558,6 +571,7 @@ const ground = new THREE.Mesh(groundGeo, new THREE.MeshLambertMaterial({ vertexC
 scene.add(ground);
 
 const trunks = [];
+const canopies = [];
 function avoid(x, z) {
   if (pathDist(x, z) < 3.6) return true;
   if (x * x + (z - 4) * (z - 4) < 36) return true;
@@ -583,11 +597,20 @@ function instanceCones(list, mat, yScale) {
   const mesh = new THREE.InstancedMesh(geo, mat, list.length);
   const d = new THREE.Object3D();
   list.forEach((t, i) => {
-    d.position.set(t.x, groundY(t.x, t.z) + 1.3 * t.s * yScale, t.z);
+    const y = groundY(t.x, t.z) + 1.3 * t.s * yScale;
+    d.position.set(t.x, y, t.z);
     d.scale.set(t.s, t.s * yScale, t.s);
+    d.rotation.set(0, 0, 0);
     d.updateMatrix();
     mesh.setMatrixAt(i, d.matrix);
     trunks.push(t);
+    canopies.push({
+      mesh, index: i, kind: "cone",
+      x: t.x, y, z: t.z,
+      rx: t.s, ry: 1.1 * t.s * yScale,
+      sx: t.s, sy: t.s * yScale, sz: t.s,
+      fade: 0, want: 0,
+    });
   });
   scene.add(mesh);
   return mesh;
@@ -615,11 +638,20 @@ instanceTrunks(oaks, trunkMat);
   const mesh = new THREE.InstancedMesh(geo, oakMat, oaks.length);
   const d = new THREE.Object3D();
   oaks.forEach((t, i) => {
-    d.position.set(t.x, groundY(t.x, t.z) + 2.1 * t.s, t.z);
+    const y = groundY(t.x, t.z) + 2.1 * t.s;
+    d.position.set(t.x, y, t.z);
     d.scale.set(t.s * 1.3, t.s * 0.9, t.s * 1.3);
+    d.rotation.set(0, 0, 0);
     d.updateMatrix();
     mesh.setMatrixAt(i, d.matrix);
     trunks.push(t);
+    canopies.push({
+      mesh, index: i, kind: "sphere",
+      x: t.x, y, z: t.z,
+      rx: 1.15 * t.s * 1.3, ry: 1.15 * t.s * 0.9,
+      sx: t.s * 1.3, sy: t.s * 0.9, sz: t.s * 1.3,
+      fade: 0, want: 0,
+    });
   });
   scene.add(mesh);
 }
@@ -727,88 +759,115 @@ const gateSpot = { x: gx, z: gz };
 
 const hero = buildHero();
 scene.add(hero);
-const monster = buildMonster();
-scene.add(monster);
 
-function monsterFace(kind) {
-  const c = document.createElement("canvas");
-  c.width = c.height = 256;
-  const g = c.getContext("2d");
-  g.clearRect(0, 0, 256, 256);
-  if (kind === "day") {
-    g.fillStyle = "#fff";
-    g.beginPath(); g.ellipse(86, 118, 32, 38, 0, 0, 7); g.ellipse(170, 118, 32, 38, 0, 0, 7); g.fill();
-    g.fillStyle = "#161616";
-    g.beginPath(); g.arc(86, 122, 16, 0, 7); g.arc(170, 122, 16, 0, 7); g.fill();
-    g.fillStyle = "#fff";
-    g.beginPath(); g.arc(80, 114, 6, 0, 7); g.arc(164, 114, 6, 0, 7); g.fill();
-    g.strokeStyle = "#1a1a1a"; g.lineWidth = 10; g.lineCap = "round";
-    g.beginPath(); g.arc(128, 168, 36, 0.15 * Math.PI, 0.85 * Math.PI); g.stroke();
-  } else {
-    g.fillStyle = "#14080c";
-    g.beginPath(); g.ellipse(86, 112, 30, 42, 0, 0, 7); g.ellipse(170, 112, 30, 42, 0, 0, 7); g.fill();
-    g.strokeStyle = "#1a0508"; g.lineWidth = 14; g.lineCap = "round";
-    g.beginPath(); g.moveTo(70, 175); g.quadraticCurveTo(128, 230, 186, 175); g.stroke();
-    g.strokeStyle = "#3a1014"; g.lineWidth = 4;
-    g.beginPath(); g.moveTo(78, 188); g.lineTo(90, 176); g.moveTo(168, 188); g.lineTo(156, 176); g.stroke();
+const INK = new THREE.MeshBasicMaterial({ color: 0x10080a });
+const MONSTER_BLACK = new THREE.MeshBasicMaterial({ color: 0x161616 });
+const EYE_WHITE = new THREE.MeshBasicMaterial({ color: 0xfff8f4 });
+
+function addSpikes(parent) {
+  const tips = [
+    [0, 0.08, 0.42], [-0.1, -0.35, 0.34], [0.1, 0.32, 0.36],
+    [-0.05, 0.2, 0.28], [0.06, -0.15, 0.3], [-0.14, 0.5, 0.24],
+    [0.14, -0.45, 0.26], [0, -0.05, 0.22],
+  ];
+  for (const [x, rz, h] of tips) {
+    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.046, h, 5), MONSTER_BLACK);
+    sp.position.set(x, 0.4 + h * 0.34, 0);
+    sp.rotation.z = rz;
+    parent.add(sp);
   }
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+}
+
+function addSmile(parent, radius, y, z, tube, drips) {
+  const smile = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 8, 18, Math.PI), INK);
+  smile.rotation.z = Math.PI;
+  smile.position.set(0, y, z);
+  parent.add(smile);
+  if (!drips) return;
+  for (let i = 0; i < 6; i++) {
+    const t = i / 5 - 0.5;
+    const drip = new THREE.Mesh(new THREE.ConeGeometry(tube * 0.85, 0.14, 4), INK);
+    drip.position.set(t * radius * 1.7, y - Math.cos(t * Math.PI) * radius * 0.35 - 0.08, z);
+    drip.rotation.x = Math.PI;
+    parent.add(drip);
+  }
+}
+
+function addMonsterFace(head, kind) {
+  const group = new THREE.Group();
+  group.name = kind === "day" ? "faceDay" : "faceNight";
+  if (kind === "day") {
+    for (const x of [-0.16, 0.16]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.115, 12, 10), EYE_WHITE);
+      eye.scale.set(1, 1.12, 0.55);
+      eye.position.set(x, 0.06, 0.4);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.055, 10, 8), INK);
+      pupil.position.set(x, 0.05, 0.47);
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.02, 6, 5), EYE_WHITE);
+      glint.position.set(x - 0.02, 0.08, 0.51);
+      group.add(eye, pupil, glint);
+    }
+    addSmile(group, 0.14, -0.14, 0.46, 0.03, false);
+  } else {
+    for (const x of [-0.17, 0.17]) {
+      const smudge = new THREE.Mesh(new THREE.SphereGeometry(0.17, 12, 10), new THREE.MeshBasicMaterial({ color: 0x2a080c }));
+      smudge.scale.set(1.05, 1.4, 0.45);
+      smudge.position.set(x, 0.05, 0.34);
+      const socket = new THREE.Mesh(new THREE.SphereGeometry(0.125, 12, 10), INK);
+      socket.scale.set(1, 1.32, 0.5);
+      socket.position.set(x, 0.04, 0.4);
+      group.add(smudge, socket);
+    }
+    addSmile(group, 0.2, -0.16, 0.44, 0.042, true);
+  }
+  head.add(group);
+  return group;
 }
 
 function buildMonster() {
   const g = new THREE.Group();
   g.name = "monster";
-  const red = lambert(0xd01218);
-  const black = lambert(0x1a1a1a);
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.95, 4, 12), red);
-  body.name = "torso";
-  body.position.y = 1.45;
-  g.add(body);
-  const trim = new THREE.Mesh(new THREE.CapsuleGeometry(0.36, 0.9, 3, 10), black);
-  trim.position.set(0, 1.45, -0.06);
-  trim.scale.z = 0.55;
+  const red = new THREE.MeshLambertMaterial({ color: 0xf2161e, emissive: 0x6a1014, emissiveIntensity: 0.35 });
+  const trim = new THREE.Mesh(new THREE.SphereGeometry(0.5, 18, 14), lambert(0x3a3a3a));
+  trim.scale.set(1.05, 1.62, 0.8);
+  trim.position.set(0, 1.08, -0.12);
   g.add(trim);
+  const body = new THREE.Mesh(new THREE.SphereGeometry(0.5, 20, 16), red);
+  body.name = "torso";
+  body.scale.set(0.9, 1.5, 0.72);
+  body.position.set(0, 1.1, 0.1);
+  g.add(body);
   const head = new THREE.Group();
   head.name = "head";
-  head.position.y = 2.28;
+  head.position.y = 2.38;
   g.add(head);
-  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.46, 20, 16), red);
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.48, 22, 16), red);
   head.add(skull);
-  const faceD = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.72), new THREE.MeshBasicMaterial({ map: monsterFace("day"), transparent: true }));
-  const faceN = new THREE.Mesh(new THREE.PlaneGeometry(0.72, 0.72), new THREE.MeshBasicMaterial({ map: monsterFace("night"), transparent: true, opacity: 0 }));
-  faceD.name = "face";
-  faceD.position.z = 0.44;
-  faceN.position.z = 0.45;
-  head.add(faceD, faceN);
-  for (let i = 0; i < 7; i++) {
-    const sp = new THREE.Mesh(new THREE.ConeGeometry(0.07, 0.28, 5), black);
-    const a = (i / 7) * Math.PI - Math.PI / 2;
-    sp.position.set(Math.cos(a) * 0.16, 0.42, Math.sin(a) * 0.08);
-    sp.rotation.z = -a * 0.4;
-    head.add(sp);
-  }
+  addSpikes(head);
+  const faceD = addMonsterFace(head, "day");
+  const faceN = addMonsterFace(head, "night");
+  faceN.visible = false;
   function arm(name, x) {
     const pivot = new THREE.Group();
     pivot.name = name;
-    pivot.position.set(x, 1.85, 0);
-    const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.03, 0.95, 6), black);
-    limb.position.y = -0.5;
+    pivot.position.set(x, 1.72, 0.02);
+    const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.022, 0.018, 1.28, 6), MONSTER_BLACK);
+    limb.position.y = -0.66;
     pivot.add(limb);
     const soft = new THREE.Group();
-    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), black);
-    palm.position.y = -1.02;
+    const palm = new THREE.Mesh(new THREE.SphereGeometry(0.09, 8, 6), MONSTER_BLACK);
+    palm.position.y = -1.34;
     soft.add(palm);
     for (let i = 0; i < 3; i++) {
-      const f = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), black);
-      f.position.set((i - 1) * 0.07, -1.12, 0.04);
+      const f = new THREE.Mesh(new THREE.SphereGeometry(0.045, 6, 5), MONSTER_BLACK);
+      f.position.set((i - 1) * 0.09, -1.46, 0.03);
       soft.add(f);
     }
     const claw = new THREE.Group();
     for (let i = 0; i < 3; i++) {
-      const c = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.2, 5), black);
-      c.position.set((i - 1) * 0.07, -1.12, 0.02);
+      const c = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.32, 5), MONSTER_BLACK);
+      c.position.set((i - 1) * 0.1, -1.42, 0.02);
+      c.rotation.z = (i - 1) * 0.35;
       c.rotation.x = Math.PI;
       claw.add(c);
     }
@@ -816,34 +875,74 @@ function buildMonster() {
     g.add(pivot);
     return { pivot, soft, claw };
   }
-  const aL = arm("armL", -0.4);
-  const aR = arm("armR", 0.4);
+  const aL = arm("armL", -0.46);
+  const aR = arm("armR", 0.46);
   function leg(name, x) {
     const pivot = new THREE.Group();
     pivot.name = name;
-    pivot.position.set(x, 0.95, 0);
-    const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.035, 0.95, 6), black);
-    limb.position.y = -0.5;
+    pivot.position.set(x, 0.7, 0);
+    const limb = new THREE.Mesh(new THREE.CylinderGeometry(0.028, 0.024, 0.62, 6), MONSTER_BLACK);
+    limb.position.y = -0.32;
     pivot.add(limb);
+    const foot = new THREE.Mesh(new THREE.SphereGeometry(0.04, 6, 4), MONSTER_BLACK);
+    foot.scale.set(1.7, 0.45, 0.9);
+    foot.position.set(0, -0.64, 0.03);
+    pivot.add(foot);
     g.add(pivot);
-    return pivot;
   }
-  leg("legL", -0.14);
-  leg("legR", 0.14);
+  leg("legL", -0.16);
+  leg("legR", 0.16);
   g.userData.faces = { day: faceD, night: faceN };
   g.userData.hands = { soft: [aL.soft, aR.soft], claw: [aL.claw, aR.claw] };
   return g;
 }
 
+function buildScareHead() {
+  const g = new THREE.Group();
+  const red = new THREE.MeshLambertMaterial({ color: 0xff2a22, emissive: 0xa01814, emissiveIntensity: 0.65 });
+  const skull = new THREE.Mesh(new THREE.SphereGeometry(0.5, 24, 18), red);
+  g.add(skull);
+  addSpikes(g);
+  addMonsterFace(g, "night");
+  g.visible = false;
+  return g;
+}
+
+const monster = buildMonster();
+scene.add(monster);
+const scareHead = buildScareHead();
+camera.add(scareHead);
+
 const bubble = makeBubble("Hi!");
+bubble.visible = false;
 scene.add(bubble);
-const bang = makeBubble("!");
-bang.scale.set(0.45, 0.45, 0.45);
+const bang = makeMark();
 scene.add(bang);
 const arrow = new THREE.Mesh(new THREE.ConeGeometry(0.16, 0.45, 8), new THREE.MeshBasicMaterial({ color: 0xffe08a }));
 arrow.rotation.x = Math.PI / 2;
 scene.add(arrow);
 
+function makeMark() {
+  const c = document.createElement("canvas");
+  c.width = 128; c.height = 160;
+  const g = c.getContext("2d");
+  g.clearRect(0, 0, 128, 160);
+  g.font = "900 120px Arial";
+  g.textAlign = "center";
+  g.textBaseline = "middle";
+  g.lineWidth = 16;
+  g.strokeStyle = "#3a1408";
+  g.strokeText("!", 64, 84);
+  g.fillStyle = "#ffe14a";
+  g.fillText("!", 64, 84);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, depthTest: false }));
+  sp.scale.set(0.42, 0.52, 1);
+  sp.renderOrder = 12;
+  sp.visible = false;
+  return sp;
+}
 function makeBubble(text) {
   const c = document.createElement("canvas");
   c.width = 512; c.height = 160;
@@ -1111,8 +1210,9 @@ function applySky() {
   butterflies.forEach((b) => { b.visible = k < 0.45; });
   fireflies.material.opacity = k > 0.4 ? (k - 0.4) * 1.4 : 0;
   const faces = monster.userData.faces;
-  faces.day.material.opacity = 1 - k;
-  faces.night.material.opacity = k;
+  const scaryFace = k > 0.58;
+  faces.day.visible = !scaryFace;
+  faces.night.visible = scaryFace;
   const hands = monster.userData.hands;
   const claws = k > 0.62;
   hands.soft.forEach((h) => { h.visible = !claws; });
@@ -1150,34 +1250,30 @@ function poseHero(dt, moving, hostile) {
   else if (hostile && (md < 15 || mon.mode === "chase")) expr = "scared";
   setExpression(expr);
   const scaredNow = expr === "scared" || expr === "terrified";
+  const wobble = scaredNow ? Math.sin(performance.now() / 70) * 0.03 : 0;
   if (armL && armR && legL && legR && head) {
-    legL.rotation.x = scaredNow ? 0.15 : swing;
-    legR.rotation.x = scaredNow ? -0.1 : -swing;
+    legL.rotation.set(scaredNow ? 0.1 : swing, 0, 0);
+    legR.rotation.set(scaredNow ? -0.06 : -swing, 0, 0);
+    head.rotation.set(wobble * 0.4, 0, wobble);
     if (scaredNow) {
-      armL.rotation.z = 2.2 + Math.sin(walkT * 2) * 0.08;
-      armR.rotation.z = -2.2 - Math.sin(walkT * 2) * 0.08;
-      armL.rotation.x = -0.4;
-      armR.rotation.x = -0.4;
-      head.rotation.x = -0.25;
-      hero.rotation.x = 0.28;
+      armL.rotation.set(-0.4 + wobble, 0, -1.05);
+      armR.rotation.set(-0.4 - wobble, 0, 1.05);
+      head.rotation.x = -0.12 + wobble;
     } else if (expr === "peek") {
-      armL.rotation.set(0.4, 0, 0.4);
-      armR.rotation.set(0.4, 0, -0.4);
-      head.rotation.x = 0.2;
-      hero.rotation.x = 0.4;
+      armL.rotation.set(0.35, 0, 0.2);
+      armR.rotation.set(0.35, 0, -0.2);
+      head.rotation.x = 0.15;
     } else if (state === "title" || !moving) {
-      armL.rotation.set(0.85, 0.2, 0.35);
-      armR.rotation.set(0.85, -0.2, -0.35);
-      head.rotation.x = 0;
-      hero.rotation.x = 0;
-      if (mon.wave > 0 && !hostile) armR.rotation.z = -2.4 + Math.sin(performance.now() / 160) * 0.25;
+      armL.rotation.set(0.7, 0, 0.35);
+      armR.rotation.set(0.7, 0, -0.35);
+      if (mon.wave > 0 && !hostile) armR.rotation.x = -0.9 + Math.sin(performance.now() / 180) * 0.2;
     } else {
-      armL.rotation.set(-swing, 0, 0.15);
-      armR.rotation.set(swing, 0, -0.15);
-      head.rotation.x = 0;
-      hero.rotation.x = 0;
+      armL.rotation.set(-swing, 0, 0.12);
+      armR.rotation.set(swing, 0, -0.12);
     }
   }
+  hero.rotation.x = 0;
+  hero.rotation.z = 0;
   if (cape && cape.userData.base) {
     const pos = cape.geometry.attributes.position;
     const base = cape.userData.base;
@@ -1193,10 +1289,7 @@ function poseHero(dt, moving, hostile) {
   if (lasso) lasso.rotation.z = Math.sin(performance.now() / 500) * 0.25;
   const ll = hero.getObjectByName("lassoLight");
   if (ll) ll.intensity = 0.25 + nightFactor * 2.1;
-  if (scaredNow && hostile) {
-    hero.position.x += Math.sin(performance.now() / 40) * 0.015;
-    hero.position.z += Math.cos(performance.now() / 35) * 0.012;
-  }
+  if (scaredNow && hostile) hero.position.y += Math.sin(performance.now() / 60) * 0.01;
 }
 
 function poseMonster(dt, moving, hostile) {
@@ -1210,12 +1303,10 @@ function poseMonster(dt, moving, hostile) {
   if (legR) legR.rotation.x = -swing;
   if (armL) armL.rotation.x = -swing;
   if (armR) armR.rotation.x = swing * 0.6;
-  if (!hostile && mon.wave > 0 && armR) {
-    armR.rotation.z = -0.4;
-    armR.rotation.x = -2.3 + Math.sin(performance.now() / 180) * 0.35;
-  } else if (armR) armR.rotation.z = 0;
   if (armL) armL.rotation.z = 0;
-  if (head && !hostile) head.rotation.z = Math.sin(performance.now() / 500) * 0.08;
+  if (armR) armR.rotation.z = 0;
+  if (!hostile && mon.wave > 0 && armR) armR.rotation.x = -1.1 + Math.sin(performance.now() / 180) * 0.25;
+  if (head) head.rotation.set(0, 0, !hostile ? Math.sin(performance.now() / 500) * 0.06 : 0);
   monster.position.set(mon.x, groundY(mon.x, mon.z) + Math.abs(Math.sin(monsterWalk)) * 0.05, mon.z);
   monster.rotation.y = mon.yaw;
 }
@@ -1306,6 +1397,9 @@ function beginScare(kind) {
 function endScare() {
   flash.style.opacity = "0";
   flash.style.background = "#ff1a1a";
+  scareHead.visible = false;
+  scareLight.intensity = 0;
+  scareCamReady = false;
   if (scareKind === "surprise") {
     mon.mode = "flee";
     mon.flee = 2.4;
@@ -1469,18 +1563,16 @@ function updatePlay(dt) {
   }
   pushOut(mon);
   mon.wave = !hostile && md < 6 ? 1 : 0;
+  if (talkT > 0 && !hostile) mon.yaw = Math.atan2(player.x - mon.x, player.z - mon.z);
   poseMonster(dt, mlen > 0.2, hostile);
   if (!hostile && md < 3.6) { /* ready to talk */ }
   if (hostile && !hiding && invuln <= 0 && md < 1.55 && mon.mode === "chase") beginScare("catch");
 
   talkT = Math.max(0, talkT - dt);
   hintT = Math.max(0, hintT - dt);
-  bubble.visible = talkT > 0 && !hostile;
-  if (bubble.visible) {
-    bubble.position.set(mon.x, groundY(mon.x, mon.z) + 3.35, mon.z);
-  }
-  bang.visible = spotT > 0;
-  if (bang.visible) bang.position.set(player.x, gy + 2.35 + player.hop, player.z);
+  bubble.visible = false;
+  bang.visible = spotT > 0 && state === "play" && !fp;
+  if (bang.visible) bang.position.set(player.x, gy + 2.55 + player.hop, player.z);
   const near = nearestLantern();
   arrow.visible = !!near && hintT > 0;
   if (near && arrow.visible) {
@@ -1545,57 +1637,186 @@ function scaredExpression(hostile, md) {
   return hostile && (expression === "scared" || expression === "terrified" || md < 15);
 }
 
+function canopyRadiusAt(c, wy) {
+  const dy = wy - c.y;
+  if (c.kind === "cone") {
+    if (dy < -c.ry || dy > c.ry) return 0;
+    return c.rx * (1 - (dy + c.ry) / (c.ry * 2));
+  }
+  if (Math.abs(dy) > c.ry) return 0;
+  return c.rx * Math.sqrt(Math.max(0, 1 - (dy / c.ry) * (dy / c.ry)));
+}
+
+const _fadeDummy = new THREE.Object3D();
+function updateCanopyFade(dt) {
+  const touched = new Set();
+  for (const c of canopies) {
+    const goal = c.want || 0;
+    const next = c.fade + (goal - c.fade) * Math.min(1, dt * 14);
+    if (Math.abs(next - c.fade) < 0.004 && next < 0.01 && goal === 0) {
+      if (c.fade !== 0) {
+        c.fade = 0;
+        _fadeDummy.position.set(c.x, c.y, c.z);
+        _fadeDummy.scale.set(c.sx, c.sy, c.sz);
+        _fadeDummy.rotation.set(0, 0, 0);
+        _fadeDummy.updateMatrix();
+        c.mesh.setMatrixAt(c.index, _fadeDummy.matrix);
+        touched.add(c.mesh);
+      }
+      continue;
+    }
+    c.fade = next;
+    const s = Math.max(0.02, 1 - c.fade);
+    _fadeDummy.position.set(c.x, c.y, c.z);
+    _fadeDummy.scale.set(c.sx * s, c.sy * s, c.sz * s);
+    _fadeDummy.rotation.set(0, 0, 0);
+    _fadeDummy.updateMatrix();
+    c.mesh.setMatrixAt(c.index, _fadeDummy.matrix);
+    touched.add(c.mesh);
+  }
+  touched.forEach((m) => { m.instanceMatrix.needsUpdate = true; });
+}
+
+function resolveCamera(camX, camY, camZ, lookX, lookY, lookZ) {
+  let x = camX, y = camY, z = camZ;
+  for (const c of canopies) c.want = 0;
+  for (let pass = 0; pass < 4; pass++) {
+    const dx = x - lookX, dy = y - lookY, dz = z - lookZ;
+    const len = Math.hypot(dx, dy, dz) || 0.001;
+    const ux = dx / len, uy = dy / len, uz = dz / len;
+    let pull = len;
+    for (const c of canopies) {
+      const along = (c.x - lookX) * ux + (c.y - lookY) * uy + (c.z - lookZ) * uz;
+      if (along > 0.25 && along < len + c.rx) {
+        const py = lookY + uy * along;
+        const rad = canopyRadiusAt(c, py) + 0.75;
+        const px = lookX + ux * along, pz = lookZ + uz * along;
+        const perp = Math.hypot(c.x - px, c.z - pz);
+        if (rad > 0.8 && perp < rad && Math.abs(c.y - py) < c.ry + 0.6) {
+          pull = Math.min(pull, Math.max(1.3, along - rad - 0.2));
+        }
+      }
+      const radCam = canopyRadiusAt(c, y);
+      const dCam = Math.hypot(c.x - x, c.z - z);
+      if (radCam > 0.15 && dCam < radCam + 0.9) {
+        pull = Math.min(pull, Math.max(1.3, len - (radCam + 0.9 - dCam) - 0.15));
+      }
+    }
+    if (pull > len - 0.04) break;
+    x = lookX + ux * pull;
+    y = lookY + uy * pull;
+    z = lookZ + uz * pull;
+  }
+  for (const c of canopies) {
+    const rad = canopyRadiusAt(c, y);
+    if (rad > 0.15 && Math.hypot(c.x - x, c.z - z) < rad + 0.45 && Math.abs(c.y - y) < c.ry + 0.3) c.want = 1;
+  }
+  return { x, y, z };
+}
+
+function aimCamera(camX, camY, camZ, lookX, lookY, lookZ) {
+  const p = resolveCamera(camX, camY, camZ, lookX, lookY, lookZ);
+  camera.position.set(p.x, p.y, p.z);
+  camera.lookAt(lookX, lookY, lookZ);
+}
+
 function placeCamera(hostile, md) {
   const scaredNow = hostile && (md < 15 || mon.mode === "chase" || expression === "scared");
   const gy = groundY(player.x, player.z);
   if (fp && state === "play") {
+    for (const c of canopies) c.want = 0;
     camera.position.set(player.x, gy + 1.6, player.z);
     const fx = Math.sin(cameraYaw), fz = Math.cos(cameraYaw);
     camera.lookAt(player.x + fx * 4, gy + 1.55 + cameraPitch, player.z + fz * 4);
     return;
   }
-  let ang = cameraYaw + Math.PI;
-  let dist = 5.4;
-  if (scaredNow && state === "play") { ang = cameraYaw + 0.95; dist = 3.6; }
-  if (hiding) dist = 4.2;
-  let best = dist;
-  const fx = Math.sin(ang), fz = Math.cos(ang);
-  for (let i = 8; i >= 1; i--) {
-    const d = dist * (i / 8);
-    const cx = player.x + fx * d, cz = player.z + fz * d;
-    let blocked = false;
-    for (const t of trunks) if ((cx - t.x) ** 2 + (cz - t.z) ** 2 < (t.r + 0.3) ** 2) blocked = true;
-    if (!blocked) { best = d; break; }
+  if (scaredNow && state === "play") {
+    const mx = mon.x - player.x, mz = mon.z - player.z;
+    const len = Math.hypot(mx, mz) || 1;
+    const sx = -mz / len, sz = mx / len;
+    const midX = (player.x + mon.x) * 0.5, midZ = (player.z + mon.z) * 0.5;
+    aimCamera(midX + sx * 3.7, gy + 1.7, midZ + sz * 3.7, midX, gy + 1.55, midZ);
+    const face = (obj, x, z) => { obj.rotation.y = Math.atan2(camera.position.x - x, camera.position.z - z); };
+    face(hero, player.x, player.z);
+    face(monster, mon.x, mon.z);
+    return;
   }
-  camera.position.set(player.x + Math.sin(ang) * best, gy + 2.15 + cameraPitch * 0.4, player.z + Math.cos(ang) * best);
-  camera.lookAt(player.x, gy + 1.25, player.z);
+  const ang = cameraYaw + Math.PI;
+  const dist = hiding ? 4.2 : 5.4;
+  const fx = Math.sin(ang), fz = Math.cos(ang);
+  aimCamera(player.x + fx * dist, gy + 2.15 + cameraPitch * 0.35, player.z + fz * dist, player.x, gy + 1.35, player.z);
 }
 
+let scareCamReady = false;
+const scareBase = new THREE.Vector3();
 function updateScare(dt) {
   scareT += dt;
-  const mild = jumpscareMode === "mild";
-  const k = clamp(scareT / 0.5, 0, 1);
-  const dist = mild ? 2.5 - 0.35 * k : 1.7 - 1.25 * k;
-  monster.rotation.y = mon.yaw;
-  poseMonster(0, false, true);
-  const face = monster.userData.faces.night;
-  const headPos = new THREE.Vector3();
-  face.getWorldPosition(headPos);
-  const dir = new THREE.Vector3();
-  face.getWorldDirection(dir);
-  camera.position.copy(headPos).addScaledVector(dir, Math.max(0.35, dist));
-  if (!mild) {
-    camera.position.x += Math.sin(scareT * 64) * 0.05;
-    camera.position.y += Math.cos(scareT * 58) * 0.035;
+  if (!scareCamReady) {
+    scareBase.copy(camera.position);
+    scareCamReady = true;
   }
-  camera.lookAt(headPos);
-  const fade = scareT > 0.95 ? clamp((scareT - 0.95) / 0.25, 0, 1) : 0;
-  flash.style.background = fade > 0 ? "#05060c" : "#ff1a1a";
-  flash.style.opacity = String(fade > 0 ? fade : (mild ? 0.08 : 0.16 + Math.abs(Math.sin(scareT * 28)) * 0.2));
+  const mild = jumpscareMode === "mild";
+  const k = clamp(scareT / 0.32, 0, 1);
+  const ease = 1 - Math.pow(1 - k, 3);
+  const dist = mild ? lerp(4.4, 3.6, ease) : lerp(5.1, 3.35, ease);
+  const sc = mild ? lerp(0.55, 1.15, ease) : lerp(0.62, 2.45, ease);
+  const shiver = mild ? 0.2 : (scareT < 0.42 ? 1 : 0.35);
+  monster.userData.faces.day.visible = false;
+  monster.userData.faces.night.visible = true;
+  monster.userData.hands.claw.forEach((h) => { h.visible = true; });
+  monster.userData.hands.soft.forEach((h) => { h.visible = false; });
+  vignette.style.opacity = "0";
+  scene.fog.density = 0.006;
+  amb.intensity = 0.7;
+  sun.intensity = 0.35;
+  camera.position.set(
+    scareBase.x + Math.sin(scareT * 78) * 0.05 * shiver,
+    scareBase.y + Math.cos(scareT * 64) * 0.035 * shiver,
+    scareBase.z
+  );
+  scareHead.visible = true;
+  bang.visible = false;
+  scareHead.position.set(Math.sin(scareT * 60) * 0.04 * shiver, -0.08, -dist);
+  scareHead.scale.setScalar(sc);
+  scareHead.rotation.set(-0.08, 0, Math.sin(scareT * 72) * 0.03 * shiver);
+  camera.updateMatrixWorld(true);
+  scareHead.getWorldPosition(_camV);
+  scareLight.intensity = mild ? 6 : 24;
+  scareLight.position.set(_camV.x, _camV.y - 0.55 * sc, _camV.z);
+  scareLight.position.lerp(camera.position, 0.2);
+  scareLight.position.y -= 0.2;
+  if (scareT < 0.045) { flash.style.background = "#fff"; flash.style.opacity = "0.92"; }
+  else if (scareT < 0.1) { flash.style.background = "#ff3a3a"; flash.style.opacity = "0.38"; }
+  else flash.style.opacity = "0";
   poseHero(dt, false, true);
   if (scareT > 1.2) endScare();
 }
 
+function placeSpeech() {
+  const el = document.getElementById("speech");
+  if (talkT <= 0 || nightFactor > 0.55 || state !== "play") { el.style.display = "none"; return; }
+  el.textContent = talkLine;
+  el.style.display = "block";
+  camera.updateMatrixWorld();
+  const v = new THREE.Vector3(mon.x, groundY(mon.x, mon.z) + 2.95, mon.z);
+  v.project(camera);
+  const w = view.clientWidth || innerWidth, h = view.clientHeight || innerHeight;
+  let x = w * 0.5, y = 110;
+  if (v.z <= 1) {
+    x = (v.x * 0.5 + 0.5) * w;
+    y = (-v.y * 0.5 + 0.5) * h;
+  }
+  el.style.left = x + "px";
+  el.style.top = y + "px";
+  const r = el.getBoundingClientRect();
+  let dx = 0, dy = 0;
+  if (r.left < 8) dx = 8 - r.left;
+  if (r.right > w - 8) dx = (w - 8) - r.right;
+  if (r.top < 8) dy = 8 - r.top;
+  if (r.bottom > h - 8) dy = (h - 8) - r.bottom;
+  el.style.left = (x + dx) + "px";
+  el.style.top = (y + dy) + "px";
+}
 function fmt(s) {
   s = Math.max(0, Math.ceil(s));
   return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
@@ -1643,6 +1864,9 @@ function frame(now) {
     if (pressed.enter) startGame();
   }
   refreshHud();
+  placeSpeech();
+  updateCanopyFade(dt);
+  if (state !== "play") bang.visible = false;
   topname.style.display = state === "title" ? "block" : "none";
   for (const k in pressed) delete pressed[k];
   renderer.render(scene, camera);
@@ -1671,12 +1895,31 @@ window.__game = {
   get talk() { return talkLine; },
   get talkT() { return talkT; },
   get monsterMode() { return mon.mode; },
+  get monsterFace() { return monster.userData.faces.night.visible ? "night" : "day"; },
+  get scareHeadOn() { return scareHead.visible; },
   get cameraYaw() { return cameraYaw; },
   set cameraYaw(v) { cameraYaw = v; },
+  cameraPos() { return { x: camera.position.x, y: camera.position.y, z: camera.position.z }; },
+  heroParts() {
+    hero.updateWorldMatrix(true, true);
+    const head = hero.getObjectByName("head");
+    const p = new THREE.Vector3();
+    head.getWorldPosition(p);
+    const tiara = head.getObjectByName("tiara");
+    const tp = new THREE.Vector3();
+    if (tiara) tiara.getWorldPosition(tp);
+    return {
+      hx: p.x, hy: p.y, hz: p.z,
+      px: hero.position.x, py: hero.position.y, pz: hero.position.z,
+      rx: hero.rotation.x, rz: hero.rotation.z,
+      tx: tp.x, ty: tp.y, tz: tp.z,
+    };
+  },
   player,
   monster: mon,
   lanterns,
   bushes: BUSHES,
+  canopies,
   gate: gateSpot,
   setPhase(name) {
     if (name === "day") cycleT = 4;
