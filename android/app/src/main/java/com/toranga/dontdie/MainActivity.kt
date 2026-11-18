@@ -79,7 +79,10 @@ class MainActivity : Activity() {
             maxOf(
                 event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
                 event.getAxisValue(MotionEvent.AXIS_GAS)
-            )
+            ),
+            event.getAxisValue(MotionEvent.AXIS_Y),
+            stick(event, MotionEvent.AXIS_Z, MotionEvent.AXIS_RX),
+            stick(event, MotionEvent.AXIS_RZ, MotionEvent.AXIS_RY)
         )
         scheduleFlush()
         return true
@@ -188,7 +191,13 @@ class MainActivity : Activity() {
     }
 
     companion object {
-        private const val GAME_URL = "https://appassets.androidplatform.net/assets/index.html?native=1"
+        private const val GAME_URL = "https://appassets.androidplatform.net/assets/launcher.html?native=1"
+
+        private fun stick(event: MotionEvent, primary: Int, secondary: Int): Float {
+            val a = event.getAxisValue(primary)
+            val b = event.getAxisValue(secondary)
+            return if (kotlin.math.abs(a) >= kotlin.math.abs(b)) a else b
+        }
         private const val CURSOR_CSS =
             "(function(){var s=document.createElement('style');s.textContent='html,body,canvas,button,div{cursor:none !important}';document.head.appendChild(s);})();"
     }

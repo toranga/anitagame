@@ -11,8 +11,8 @@ android {
         applicationId = "com.toranga.dontdie"
         minSdk = 21
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.1"
     }
 
     buildTypes {
@@ -49,10 +49,15 @@ val copyGameAsset = tasks.register<Copy>("copyGameAsset") {
     into(gameAssets)
 }
 
+val copyForest = tasks.register<Copy>("copyForest") {
+    from(rootProject.layout.projectDirectory.dir("../forest"))
+    into(gameAssets.map { it.dir("forest") })
+}
+
 android.sourceSets.getByName("main").assets.srcDir(gameAssets)
 
 tasks.configureEach {
     if (name.startsWith("merge") && name.endsWith("Assets")) {
-        dependsOn(copyGameAsset)
+        dependsOn(copyGameAsset, copyForest)
     }
 }

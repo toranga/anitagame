@@ -152,7 +152,7 @@ test('gamepad plays the game and one-shot buttons do not repeat', async ({ brows
   await page.waitForTimeout(250);
   expect(await page.evaluate(() => window.__game.paused)).toBe(true);
   await page.evaluate(() => window.__pad.set(9, false));
-  await page.waitForTimeout(50);
+  await page.waitForTimeout(250);
   await page.evaluate(() => window.__pad.set(9, true));
   await page.waitForFunction(() => !window.__game.paused);
   await page.evaluate(() => window.__pad.set(9, false));
