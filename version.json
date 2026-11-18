@@ -1,6 +1,6 @@
 {
-  "versionCode": 4,
-  "versionName": "1.3",
+  "versionCode": 5,
+  "versionName": "1.4",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "In-app updates, smoother Shield controls, and a lasso swing."
+  "notes": "Roblox-style sticks: forward is stick up, softer sensitivity, and a jump."
 }

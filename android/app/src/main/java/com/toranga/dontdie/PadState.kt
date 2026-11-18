@@ -96,6 +96,10 @@ class PadState {
         sb.append(fmt(leftTrigger))
         sb.append(";window.__nativeR2=")
         sb.append(fmt(rightTrigger))
+        sb.append(";window.__nativeHatX=")
+        sb.append(fmt(hatX))
+        sb.append(";window.__nativeHatY=")
+        sb.append(fmt(hatY))
         sb.append(";window.__nativeButtons=[")
         for (index in pressed.indices) {
             if (index > 0) sb.append(',')

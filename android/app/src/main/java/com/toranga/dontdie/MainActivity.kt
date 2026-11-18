@@ -45,6 +45,7 @@ class MainActivity : Activity() {
         configureWebView(webView)
         updates = AppUpdateController(this)
         webView.addJavascriptInterface(UpdateBridge(), "AndroidUpdates")
+        webView.addJavascriptInterface(AppBridge(), "AnitaApp")
         webView.loadUrl(GAME_URL)
         updates.checkOnLaunch()
     }
@@ -214,6 +215,13 @@ class MainActivity : Activity() {
         @JavascriptInterface
         fun check() {
             runOnUiThread { updates.checkFromMenu() }
+        }
+    }
+
+    private inner class AppBridge {
+        @JavascriptInterface
+        fun quit() {
+            runOnUiThread { finishAndRemoveTask() }
         }
     }
 
