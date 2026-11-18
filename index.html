@@ -40,6 +40,62 @@ const ctx = cv.getContext('2d');
 const touchLayer = document.createElement('div');
 Object.assign(touchLayer.style, { position:'absolute', inset:'0', pointerEvents:'none', display: isTouch ? 'block' : 'none', zIndex:'2' });
 root.appendChild(touchLayer);
+const toggleBtn = document.createElement('button');
+toggleBtn.type = 'button';
+toggleBtn.id = 'hide-buttons';
+toggleBtn.setAttribute('aria-label', 'Hide or show on-screen buttons');
+Object.assign(toggleBtn.style, {
+  position:'absolute', zIndex:'4', margin:'0', cursor:'pointer', pointerEvents:'auto',
+  border:'3px solid #ffe35a', background:'rgba(10,10,42,0.92)', color:'#ffe35a',
+  fontFamily:'Arial, sans-serif', fontWeight:'bold', lineHeight:'1.1', borderRadius:'999px',
+  boxShadow:'0 2px 10px #000a', touchAction:'manipulation', whiteSpace:'nowrap',
+  userSelect:'none', webkitUserSelect:'none', webkitTapHighlightColor:'transparent'
+});
+root.appendChild(toggleBtn);
+const LS_BUTTONS = 'dontdie-hide-buttons';
+let manualHide = null, autoHide = false, padConnected = false;
+try {
+  const saved = localStorage.getItem(LS_BUTTONS);
+  if (saved === 'hidden') manualHide = true;
+  else if (saved === 'shown') manualHide = false;
+} catch (e) {}
+function gameplayButtonsHidden(){
+  if (manualHide === true) return true;
+  if (manualHide === false) return false;
+  if (autoHide) return true;
+  return !isTouch;
+}
+function applyTouchChrome(){
+  const hidden = gameplayButtonsHidden();
+  touchLayer.style.display = hidden ? 'none' : 'block';
+  const label = hidden ? 'Show buttons' : 'Hide buttons';
+  if (toggleBtn.textContent !== label) toggleBtn.textContent = label;
+  toggleBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
+  const rw = root.clientWidth || 960, rh = root.clientHeight || 540;
+  const s = Math.max(0.75, Math.min(rw / W, rh / H) || 1);
+  const bs = Math.round(Math.max(58, Math.min(120, Math.min(rw, rh) * 0.2)));
+  const g = Math.round(bs * 0.14);
+  toggleBtn.style.fontSize = Math.round(16 * s) + 'px';
+  toggleBtn.style.padding = Math.round(8 * s) + 'px ' + Math.round(12 * s) + 'px';
+  toggleBtn.style.borderWidth = Math.max(2, Math.round(3 * s)) + 'px';
+  toggleBtn.style.left = 'auto';
+  toggleBtn.style.bottom = 'auto';
+  toggleBtn.style.transform = 'none';
+  // Pause and mute sit in the top-right while the gameplay buttons are visible.
+  toggleBtn.style.top = (hidden ? Math.round(10 * s) : (g + Math.round(bs * 0.62) + Math.round(8 * s))) + 'px';
+  toggleBtn.style.right = Math.round(10 * s) + 'px';
+}
+function toggleButtons(){
+  manualHide = !gameplayButtonsHidden();
+  try { localStorage.setItem(LS_BUTTONS, manualHide ? 'hidden' : 'shown'); } catch (e) {}
+  applyTouchChrome();
+}
+on(toggleBtn, 'keydown', e => {
+  if (e.code === 'Space' || e.code === 'Enter' || e.code === 'NumpadEnter') e.preventDefault();
+});
+on(toggleBtn, 'touchstart', e => { if (e.cancelable) e.preventDefault(); e.stopPropagation(); }, {passive:false});
+on(toggleBtn, 'mousedown', e => e.stopPropagation());
+on(toggleBtn, 'click', e => { e.preventDefault(); e.stopPropagation(); audio(); toggleButtons(); });
 const BTN_DEFS = [
   {k:'left',  label:'\u25C0', side:'L', col:0, row:0, wide:1.15},
   {k:'right', label:'\u25B6', side:'L', col:1, row:0, wide:1.15},
@@ -85,6 +141,7 @@ function fit(){
     else { el.style.right = (g + d.col*(w+g))+'px'; el.style.top = g+'px'; }
   }
   portrait.style.display = (isTouch && rh > rw * 1.05) ? 'flex' : 'none';
+  applyTouchChrome();
 }
 on(window, 'resize', fit); on(window, 'orientationchange', () => setTimeout(fit, 200));
 if (window.ResizeObserver){ const ro = new ResizeObserver(fit); ro.observe(root); LISTENERS.push([{removeEventListener(){ ro.disconnect(); }}, 'x', null]); }
@@ -123,13 +180,86 @@ const SFX = {
 
 // ---------- input ----------
 const keys = {}; const pressed = {};
+const heldBy = { key: {}, pad: {}, touch: {} };
 const KEYMAP = { ArrowLeft:'left', KeyA:'left', ArrowRight:'right', KeyD:'right', ArrowUp:'jump', KeyW:'jump', Space:'jump',
-  KeyF:'fly', ShiftLeft:'fly', ShiftRight:'fly', KeyZ:'laser', KeyJ:'laser', KeyX:'talk', Enter:'enter', NumpadEnter:'enter', KeyM:'mute', KeyP:'pause' };
-function press(k){ if(!keys[k]) pressed[k] = true; keys[k] = true; }
-function release(k){ keys[k] = false; }
+  KeyF:'fly', ShiftLeft:'fly', ShiftRight:'fly', KeyZ:'laser', KeyJ:'laser', KeyX:'talk', Enter:'enter', NumpadEnter:'enter', KeyM:'mute', KeyP:'pause',
+  KeyH:'hidetoggle' };
+function recompute(k){
+  const on = !!(heldBy.key[k] || heldBy.pad[k] || heldBy.touch[k]);
+  if (on){ if (!keys[k]) pressed[k] = true; keys[k] = true; }
+  else keys[k] = false;
+}
+function setHeld(src, k, down){
+  const bag = heldBy[src];
+  const next = !!down;
+  if (!!bag[k] === next) return;
+  if (next) bag[k] = true; else delete bag[k];
+  recompute(k);
+}
+function press(k){ setHeld('key', k, true); }
+function release(k){ setHeld('key', k, false); }
 function tapEnter(){ press('enter'); setTimeout(() => release('enter'), 60); }
-on(window, 'keydown', e => { audio(); const k = KEYMAP[e.code]; if(k){ e.preventDefault(); press(k); } });
-on(window, 'keyup', e => { const k = KEYMAP[e.code]; if(k){ e.preventDefault(); release(k); } });
+function isRemoteBack(e){
+  return e.code === 'Escape' || e.code === 'BrowserBack' || e.key === 'Escape' || e.key === 'BrowserBack' || e.key === 'GoBack' || e.keyCode === 4 || e.keyCode === 461;
+}
+function actionFromKey(e){
+  if (KEYMAP[e.code]) return KEYMAP[e.code];
+  // Android TV DPAD center often arrives as keyCode 23, sometimes with an empty code.
+  if (e.keyCode === 23) return 'enter';
+  if (e.key === 'Enter' || e.key === 'NumpadEnter') return 'enter';
+  return null;
+}
+on(window, 'keydown', e => {
+  audio();
+  if (isRemoteBack(e)){ e.preventDefault(); return; }
+  const k = actionFromKey(e);
+  if (k){ e.preventDefault(); press(k); }
+});
+on(window, 'keyup', e => {
+  if (isRemoteBack(e)){ e.preventDefault(); return; }
+  const k = actionFromKey(e);
+  if (k){ e.preventDefault(); release(k); }
+});
+const PAD_DEAD = 0.3;
+function padButton(pad, i){
+  const b = pad.buttons && pad.buttons[i];
+  if (!b) return false;
+  return !!(b.pressed || (typeof b.value === 'number' && b.value > 0.5));
+}
+function pollGamepad(){
+  let pad = null;
+  try {
+    const list = navigator.getGamepads ? navigator.getGamepads() : null;
+    if (list){
+      for (let i = 0; i < list.length; i++){
+        const g = list[i];
+        if (g && g.connected){ pad = g; break; }
+      }
+    }
+  } catch (e) {}
+  const now = !!pad;
+  if (now && !padConnected && manualHide === null) autoHide = true;
+  if (now !== padConnected){ padConnected = now; applyTouchChrome(); }
+  else padConnected = now;
+  if (!pad){
+    for (const k of Object.keys(heldBy.pad)) setHeld('pad', k, false);
+    return;
+  }
+  const ax = (pad.axes && pad.axes.length) ? pad.axes[0] : 0;
+  const a = padButton(pad, 0);
+  const start = padButton(pad, 9);
+  setHeld('pad', 'left', ax < -PAD_DEAD || padButton(pad, 14));
+  setHeld('pad', 'right', ax > PAD_DEAD || padButton(pad, 15));
+  setHeld('pad', 'jump', a || padButton(pad, 12));
+  setHeld('pad', 'laser', padButton(pad, 1) || padButton(pad, 3));
+  setHeld('pad', 'talk', padButton(pad, 2));
+  setHeld('pad', 'fly', padButton(pad, 5) || padButton(pad, 7));
+  // A or Start begins and restarts like Enter. Start also pauses during play.
+  setHeld('pad', 'enter', a || start);
+  setHeld('pad', 'pause', start);
+  // Back/Select hides or shows the on-screen buttons. Sound stays on M.
+  setHeld('pad', 'hidetoggle', padButton(pad, 8));
+}
 
 let gestured = false;
 function firstGesture(){
@@ -147,20 +277,19 @@ function firstGesture(){
   }
 }
 // multi-touch: every frame of touch activity, recompute which buttons are under any finger
-const touchHeld = {};
 function btnAt(x, y){ const el = document.elementFromPoint(x, y); const b = el && el.closest ? el.closest('[data-k]') : null; return (b && touchLayer.contains(b)) ? b.dataset.k : null; }
 function onTouch(e){
+  if (e.target === toggleBtn || (e.target && toggleBtn.contains && toggleBtn.contains(e.target))) return;
   if (e.cancelable) e.preventDefault();
   firstGesture();
+  if (manualHide === null && autoHide){ autoHide = false; applyTouchChrome(); }
   const active = new Set();
   for (const t of e.touches){ const k = btnAt(t.clientX, t.clientY); if (k) active.add(k); }
   let tapOutside = false;
   if (e.type === 'touchstart') for (const t of e.changedTouches) if (!btnAt(t.clientX, t.clientY)) tapOutside = true;
   for (const k in BTN){
     const isOn = active.has(k);
-    if (isOn && !touchHeld[k]) press(k);
-    if (!isOn && touchHeld[k]) release(k);
-    touchHeld[k] = isOn;
+    setHeld('touch', k, isOn);
     BTN[k].el.style.background = isOn ? 'rgba(255,79,165,0.55)' : 'rgba(255,255,255,0.16)';
     BTN[k].el.style.transform = isOn ? 'scale(0.93)' : '';
   }
@@ -241,6 +370,7 @@ function hurt(fromX){
 // ---------- update ----------
 function update(dt){
   T += dt;
+  if (pressed.hidetoggle) toggleButtons();
   if (pressed.mute){ muted = !muted; }
   if (state === 'title'){ if (pressed.enter){ newGame(); state = 'play'; SFX.gate(); } return; }
   if (state === 'dead' || state === 'win'){ if (pressed.enter){ newGame(); state = 'play'; SFX.gate(); } updateFx(dt); return; }
@@ -536,8 +666,8 @@ function drawHUD(){
     ctx.fillStyle = '#ffe35a'; ctx.fillText((isTouch ? 'Lightning = ZAP it!' : 'Lightning = LASER it! (Z)'), W/2 + 125, 110);
     ctx.fillStyle = '#fff'; ctx.fillText('Find 5 diamonds, beat the cat monster... and DON\'T DIE!', W/2, 132);
     ctx.globalAlpha = 1; }
-  if (!isTouch){ ctx.textAlign = 'right'; ctx.font = 'bold 12px Arial'; ctx.fillStyle = '#ffffff88'; ctx.fillText((muted ? 'Sound OFF' : 'Sound ON') + ' (M)   Pause (P)', W - 12, 22); }
-  if (paused){ ctx.fillStyle = '#0008'; ctx.fillRect(0,0,W,H); bigText('PAUSED', H/2, 60); ctx.font = 'bold 20px Arial'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText((isTouch ? 'Tap the screen to keep playing' : 'Press P to keep playing'), W/2, H/2 + 50); }
+  if (!isTouch){ ctx.textAlign = 'right'; ctx.font = 'bold 12px Arial'; ctx.fillStyle = '#ffffff88'; ctx.fillText((muted ? 'Sound OFF' : 'Sound ON') + ' (M)   Pause (P)', W - 12, 70); }
+  if (paused){ ctx.fillStyle = '#0008'; ctx.fillRect(0,0,W,H); bigText('PAUSED', H/2, 60); ctx.font = 'bold 20px Arial'; ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText((padConnected ? 'Press START or P to keep playing' : (isTouch ? 'Tap the screen to keep playing' : 'Press P to keep playing')), W/2, H/2 + 50); }
 }
 function bigText(text, y, size, c1='#ff3a5c', c2='#a14bff'){
   ctx.save(); ctx.textAlign = 'center'; ctx.font = '900 ' + size + 'px "Arial Black", Impact, Arial';
@@ -555,14 +685,18 @@ function drawTitle(){
   const line = [['hero',120,140],['friend',110,250],['boss',210,480],['pink',100,710],['blob',85,830]];
   for (const [k,h,x] of line) drawSprite(IMG[k], x, GROUND + 6 + (k==='boss'?0:Math.sin(T*4 + x)*-4), h, false, 1, 0, 1, 1);
   ctx.textAlign = 'center';
-  if (Math.floor(T*2) % 2 === 0){ ctx.font = 'bold 30px "Arial Black", Arial'; ctx.fillStyle = '#ffe35a'; ctx.strokeStyle = '#1a0630'; ctx.lineWidth = 6; ctx.strokeText((isTouch ? 'Tap the screen to start' : 'Press ENTER to start'), W/2, 215); ctx.fillText((isTouch ? 'Tap the screen to start' : 'Press ENTER to start'), W/2, 215); }
-  roundRect(W/2 - 300, 232, 600, 100, 14); ctx.fillStyle = '#0a0a2acc'; ctx.fill();
-  ctx.font = 'bold 16px Arial'; ctx.fillStyle = '#fff';
-  if (isTouch){ ctx.fillText('Left buttons: run     JUMP: jump     FLY: hold to fly', W/2, 258);
-    ctx.fillText('ZAP: laser     TALK: talk     II: pause     \u266B: sound', W/2, 282); }
-  else { ctx.fillText('Run: Arrows or A/D     Jump: Space or Up     Fly: hold F or Shift', W/2, 258);
-    ctx.fillText('Laser: Z or J     Talk: X     Pause: P     Sound: M', W/2, 282); }
-  ctx.fillStyle = '#ffb3e6'; ctx.fillText('Find the 5 missing diamonds and beat the cat monster!', W/2, 312);
+  const prompt = padConnected ? 'Press A or START to play' : (isTouch ? 'Tap the screen to start' : 'Press ENTER to start');
+  if (Math.floor(T*2) % 2 === 0){ ctx.font = 'bold 28px "Arial Black", Arial'; ctx.fillStyle = '#ffe35a'; ctx.strokeStyle = '#1a0630'; ctx.lineWidth = 6; ctx.strokeText(prompt, W/2, 208); ctx.fillText(prompt, W/2, 208); }
+  roundRect(W/2 - 400, 222, 800, 128, 14); ctx.fillStyle = '#0a0a2acc'; ctx.fill();
+  ctx.font = 'bold 15px Arial'; ctx.fillStyle = '#fff';
+  if (isTouch){ ctx.fillText('Left buttons: run     JUMP: jump     FLY: hold to fly', W/2, 246);
+    ctx.fillText('ZAP: laser     TALK: talk     II: pause     \u266B: sound     Buttons: H', W/2, 268); }
+  else { ctx.fillText('Run: Arrows or A/D     Jump: Space or Up     Fly: hold F or Shift', W/2, 246);
+    ctx.fillText('Laser: Z or J     Talk: X     Pause: P     Sound: M     Buttons: H', W/2, 268); }
+  ctx.fillStyle = '#c9e4ff';
+  ctx.fillText('Controller: Stick or D-pad run, A jump, B/Y laser, X talk, RB/RT fly', W/2, 292);
+  ctx.fillText('Start pauses. Back, H, or the corner button hides on-screen buttons.', W/2, 314);
+  ctx.fillStyle = '#ffb3e6'; ctx.fillText('Find the 5 missing diamonds and beat the cat monster!', W/2, 336);
 }
 function drawEnd(){
   ctx.fillStyle = state === 'dead' ? '#1a0018b0' : '#0a0a3a90'; ctx.fillRect(0, 0, W, H);
@@ -576,7 +710,9 @@ function drawEnd(){
     ctx.font = 'bold 26px Arial'; ctx.fillStyle = '#fff'; ctx.fillText('You found all 5 diamonds and beat the cat monster!', W/2, 265);
     ctx.fillStyle = '#7ff6ff'; ctx.fillText('YOU ARE A HERO!', W/2, 305);
   }
-  if (Math.floor(T*2) % 2 === 0){ ctx.font = 'bold 26px "Arial Black", Arial'; ctx.fillStyle = '#ffe35a'; ctx.fillText(isTouch ? (state === 'dead' ? 'Tap to try again' : 'Tap to play again') : (state === 'dead' ? 'Press ENTER to try again' : 'Press ENTER to play again'), W/2, 380); }
+  if (Math.floor(T*2) % 2 === 0){ ctx.font = 'bold 26px "Arial Black", Arial'; ctx.fillStyle = '#ffe35a';
+    const again = padConnected ? (state === 'dead' ? 'Press A or START to try again' : 'Press A or START to play again') : (isTouch ? (state === 'dead' ? 'Tap to try again' : 'Tap to play again') : (state === 'dead' ? 'Press ENTER to try again' : 'Press ENTER to play again'));
+    ctx.fillText(again, W/2, 380); }
 }
 function draw(){
   ctx.save();
@@ -590,13 +726,15 @@ let last = performance.now(), raf = 0, alive = true;
 function loop(now){
   if (!alive) return;
   const dt = Math.min(0.033, Math.max(0, (now - last)/1000)); last = now;
+  pollGamepad();
   update(dt); for (const k in pressed) delete pressed[k];
+  applyTouchChrome();
   touchLayer.style.opacity = (state === 'play') ? '1' : '0.35';
   draw(); raf = requestAnimationFrame(loop);
 }
 raf = requestAnimationFrame(loop);
 const refit = setInterval(fit, 1000); LISTENERS.push([{removeEventListener(){ clearInterval(refit); }}, 'x', null]);
-window.__game = { get blobs(){ return blobs; }, get state(){ return state; }, get player(){ return player; }, get boss(){ return boss; }, get bubbles(){ return bubbles; }, get diamonds(){ return diamonds; }, npcs:()=>npcs, isTouch };
+window.__game = { get blobs(){ return blobs; }, get state(){ return state; }, get player(){ return player; }, get boss(){ return boss; }, get bubbles(){ return bubbles; }, get diamonds(){ return diamonds; }, get lasers(){ return lasers; }, get paused(){ return paused; }, get muted(){ return muted; }, get padConnected(){ return padConnected; }, get buttonsHidden(){ return gameplayButtonsHidden(); }, get t(){ return T; }, npcs:()=>npcs, isTouch };
 return function stop(){ alive = false; cancelAnimationFrame(raf); for (const [t, ty, fn, o] of LISTENERS) t.removeEventListener(ty, fn, o); try { if (AC) AC.close(); } catch(e){} root.innerHTML = ''; };
 }
 
