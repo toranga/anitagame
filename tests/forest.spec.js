@@ -266,7 +266,7 @@ test('lasso swing and right-stick camera orbit', async ({ browser }) => {
 
   const yaw0 = await page.evaluate(() => window.__game.cameraYaw);
   await page.evaluate(() => window.__pad.look(0.95, -0.8));
-  await page.waitForFunction((y) => window.__game.cameraYaw > y + 0.35, yaw0);
+  await page.waitForFunction((y) => window.__game.cameraYaw < y - 0.35, yaw0);
   await page.waitForTimeout(180);
   await page.screenshot({ path: path.join(ARTIFACTS, 'forest-camera.png') });
   const held = await page.evaluate(() => window.__game.cameraYaw);
@@ -443,7 +443,7 @@ test('title focus follows the remote, and both look paths turn the same way', as
     window.__nativeRightY = 0;
     return window.__game.cameraYaw;
   });
-  await page.waitForFunction((y) => window.__game.cameraYaw > y + 0.35, yaw0);
+  await page.waitForFunction((y) => window.__game.cameraYaw < y - 0.35, yaw0);
   const pitch0 = await page.evaluate(() => {
     window.__nativeRightX = 0;
     window.__nativeRightY = -0.95;
@@ -485,7 +485,7 @@ test('title focus follows the remote, and both look paths turn the same way', as
     window.__pad.look(0.95, 0);
     return window.__game.cameraYaw;
   });
-  await padPage.waitForFunction((y) => window.__game.cameraYaw > y + 0.35, gy);
+  await padPage.waitForFunction((y) => window.__game.cameraYaw < y - 0.35, gy);
   const gp = await padPage.evaluate(() => {
     window.__pad.look(0, -0.95);
     return window.__game.cameraPitch;
@@ -569,8 +569,8 @@ test('right moves toward the right of the screen at several camera yaws', async 
 
   async function orbitPast(limit, native) {
     await page.evaluate((useNative) => {
-      if (useNative) window.__pad.nativeLook(0.95);
-      else window.__pad.look(0.95, 0);
+      if (useNative) window.__pad.nativeLook(-0.95);
+      else window.__pad.look(-0.95, 0);
     }, native);
     await page.waitForFunction((y) => window.__game.cameraYaw > y, limit);
     await page.evaluate((useNative) => {
@@ -626,6 +626,109 @@ test('right moves toward the right of the screen at several camera yaws', async 
   await page.waitForFunction(() => document.querySelector('#opts .focus').textContent === 'Options');
   await page.keyboard.press('Enter');
   await expect(page.locator('#opts button', { hasText: 'Invert move X' })).toHaveText(/Invert move X: OFF/);
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('right stick turns the view right and up looks up', async ({ browser }) => {
+  test.setTimeout(60000);
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, baseURL: 'http://127.0.0.1:4173' });
+  await context.addInitScript(() => {
+    const blank = () => Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+    const state = { axes: [0, 0, 0, 0] };
+    window.__pad = {
+      look(x, y) { state.axes[2] = x; state.axes[3] = y; },
+      nativeLook(x, y) {
+        window.__nativePad = true;
+        window.__nativeAxis = 0;
+        window.__nativeAxisY = 0;
+        window.__nativeRightX = x;
+        window.__nativeRightY = y;
+        window.__nativeButtons = blank();
+      },
+    };
+    navigator.getGamepads = () => [{
+      id: 'Mock Pad', index: 0, connected: true, mapping: 'standard',
+      axes: state.axes.slice(),
+      buttons: blank(),
+      timestamp: Date.now(),
+    }];
+  });
+  const page = await context.newPage();
+  const errors = track(page);
+  await page.goto('/forest/index.html');
+  await page.waitForFunction(() => window.__game && window.__game.state === 'title');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => window.__game.state === 'play');
+
+  async function aim(yaw) {
+    await page.evaluate((y) => {
+      window.__game.setPhase('day');
+      window.__game.monster.x = 90;
+      window.__game.monster.z = 90;
+      window.__game.monster.mode = 'wander';
+      window.__game.player.x = 2;
+      window.__game.player.z = 28;
+      window.__game.cameraYaw = y;
+      window.__game.cameraPitch = 0;
+    }, yaw);
+    await page.waitForTimeout(200);
+  }
+
+  async function sweep(yaw, apply, release) {
+    await aim(yaw);
+    const marker = await page.evaluate(() => {
+      const y = window.__game.cameraYaw;
+      const p = window.__game.player;
+      return { x: p.x + Math.sin(y) * 12, y: 1.4, z: p.z + Math.cos(y) * 12 };
+    });
+    const before = await page.evaluate((m) => window.__game.project(m.x, m.y, m.z), marker);
+    await apply();
+    await page.waitForTimeout(380);
+    await release();
+    await page.waitForTimeout(80);
+    const after = await page.evaluate((m) => window.__game.project(m.x, m.y, m.z), marker);
+    return { dsx: after.x - before.x, dsy: after.y - before.y };
+  }
+
+  const yaws = [0, 1.25, 2.5, -0.9];
+  for (const yaw of yaws) {
+    const right = await sweep(yaw, () => page.evaluate(() => window.__pad.look(1, 0)), () => page.evaluate(() => window.__pad.look(0, 0)));
+    const left = await sweep(yaw, () => page.evaluate(() => window.__pad.look(-1, 0)), () => page.evaluate(() => window.__pad.look(0, 0)));
+    const up = await sweep(yaw, () => page.evaluate(() => window.__pad.look(0, -1)), () => page.evaluate(() => window.__pad.look(0, 0)));
+    expect(right.dsx, 'gamepad right yaw ' + yaw).toBeLessThan(-30);
+    expect(left.dsx, 'gamepad left yaw ' + yaw).toBeGreaterThan(30);
+    expect(up.dsy, 'gamepad up yaw ' + yaw).toBeGreaterThan(8);
+  }
+
+  await aim(0);
+  const mouse = await sweep(0, async () => {
+    await page.mouse.move(980, 360);
+    await page.mouse.down();
+    await page.mouse.move(1180, 360, { steps: 8 });
+    await page.mouse.up();
+  }, async () => {});
+  expect(mouse.dsx, 'mouse right').toBeLessThan(-30);
+
+  await page.evaluate(() => window.__pad.nativeLook(0, 0));
+  for (const yaw of yaws) {
+    const right = await sweep(yaw, () => page.evaluate(() => window.__pad.nativeLook(1, 0)), () => page.evaluate(() => window.__pad.nativeLook(0, 0)));
+    const left = await sweep(yaw, () => page.evaluate(() => window.__pad.nativeLook(-1, 0)), () => page.evaluate(() => window.__pad.nativeLook(0, 0)));
+    const up = await sweep(yaw, () => page.evaluate(() => window.__pad.nativeLook(0, -1)), () => page.evaluate(() => window.__pad.nativeLook(0, 0)));
+    expect(right.dsx, 'native right yaw ' + yaw).toBeLessThan(-30);
+    expect(left.dsx, 'native left yaw ' + yaw).toBeGreaterThan(30);
+    expect(up.dsy, 'native up yaw ' + yaw).toBeGreaterThan(8);
+  }
+
+  await page.evaluate(() => localStorage.setItem('spooky-invert-x', '1'));
+  await page.reload();
+  await page.waitForFunction(() => window.__game && window.__game.state === 'title');
+  expect(await page.evaluate(() => localStorage.getItem('spooky-invert-x'))).toBe(null);
+  await page.keyboard.press('ArrowDown');
+  await page.waitForFunction(() => document.querySelector('#opts .focus').textContent === 'Options');
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#opts button', { hasText: 'Invert camera X' })).toHaveText(/Invert camera X: OFF/);
+
   expect(errors).toEqual([]);
   await context.close();
 });

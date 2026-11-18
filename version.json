@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.6",
+  "versionCode": 8,
+  "versionName": "1.7",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "Pushing the left stick right moves the hero to the right of the screen."
+  "notes": "Pushing the right stick right turns the view right."
 }

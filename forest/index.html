@@ -1112,7 +1112,8 @@ const LS_SCARE = "spooky-jumpscares";
 const LS_START = "spooky-start";
 const LS_SENS = "spooky-sens";
 const LS_INVERT = "spooky-invert-y";
-const LS_INVERTX = "spooky-invert-x";
+const LS_INVERTX = "spooky-invert-x-v2";
+const LS_INVERTX_OLD = "spooky-invert-x";
 const LS_INVERT_MOVE_X = "spooky-invert-move-x";
 const LS_FOLLOW = "spooky-follow";
 const LS_DEBUG = "spooky-pad-debug";
@@ -1135,6 +1136,7 @@ try {
   const sens = localStorage.getItem(LS_SENS);
   if (sens === "low" || sens === "med" || sens === "high") stickSens = sens;
   invertY = localStorage.getItem(LS_INVERT) === "1";
+  localStorage.removeItem(LS_INVERTX_OLD);
   invertX = localStorage.getItem(LS_INVERTX) === "1";
   invertMoveX = localStorage.getItem(LS_INVERT_MOVE_X) === "1";
   camFollow = localStorage.getItem(LS_FOLLOW) === "1";
@@ -1603,8 +1605,10 @@ function updateCamera(dt, moving) {
   const mul = sensMul();
   const xSign = invertX ? -1 : 1;
   const ySign = invertY ? -1 : 1;
-  camYaw += lookTarget.x * xSign * 3 * mul * dt;
-  camYaw += lookDX * 0.005;
+  // Increasing yaw slides a fixed object toward screen-right, which is a
+  // left turn. Stick-right and mouse-right subtract from yaw so the view turns right.
+  camYaw -= lookTarget.x * xSign * 3 * mul * dt;
+  camYaw -= lookDX * 0.005;
   camPitch = clamp(camPitch - lookTarget.y * ySign * 2 * mul * dt - lookDY * 0.003, -0.85, 0.7);
   lookDX = 0;
   lookDY = 0;
@@ -2246,6 +2250,7 @@ window.__game = {
   get cameraYaw() { return cameraYaw; },
   set cameraYaw(v) { camYaw = v; cameraYaw = v; },
   get cameraPitch() { return camPitch; },
+  set cameraPitch(v) { camPitch = v; cameraPitch = v; },
   get orbitYaw() { return camYaw - heroYaw; },
   get lassoT() { return lassoT; },
   get stunT() { return stunT; },
@@ -2260,6 +2265,14 @@ window.__game = {
   projectFrozen(x, y, z) {
     _projV.set(x, y, z).applyMatrix4(_viewProj);
     return { x: _projV.x, y: _projV.y, z: _projV.z };
+  },
+  project(x, y, z) {
+    camera.updateMatrixWorld(true);
+    _projV.set(x, y, z).project(camera);
+    return {
+      x: (_projV.x * 0.5 + 0.5) * innerWidth,
+      y: (-_projV.y * 0.5 + 0.5) * innerHeight,
+    };
   },
   heroParts() {
     hero.updateWorldMatrix(true, true);

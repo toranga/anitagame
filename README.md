@@ -47,12 +47,12 @@ On the title screen, a connected controller changes the prompt to "Press A to st
 
 ## Play on NVIDIA Shield
 
-The browser on Android TV turns the D-pad into a mouse and treats B as Back. The native app sends those buttons to the game instead. It is landscape, fullscreen, and works offline. The download is 2.0 MB (2,054,457 bytes), versionCode 7.
+The browser on Android TV turns the D-pad into a mouse and treats B as Back. The native app sends those buttons to the game instead. It is landscape, fullscreen, and works offline. The download is 2.0 MB (2,054,610 bytes), versionCode 8.
 
 1. On the Shield, install the free **Downloader** app by AFTVnews from the Play Store.
 2. Allow Downloader to install unknown apps when Android asks (or in Settings, Apps, Downloader, Install unknown apps).
 3. In Downloader, enter `https://toranga.github.io/anitagame/DontDie.apk` and download it.
-4. Install the APK. If you already have the app, this build is an update (versionCode 7) signed with the same debug key. The app offers it from Check for updates once `version.json` is published.
+4. Install the APK. If you already have the app, this build is an update (versionCode 8) signed with the same debug key. The app offers it from Check for updates once `version.json` is published.
 5. Launch **Anita's Games**, then choose DON'T DIE or SPOOKY FOREST. The app also checks `version.json` on this site and can download a newer APK from the game picker (**Check for updates**).
 
 To publish another Android build: bump `versionCode` in `android/app/build.gradle.kts`, run the release build, copy the APK to `DontDie.apk`, and set the same `versionCode`, `versionName`, and notes in `version.json`.
