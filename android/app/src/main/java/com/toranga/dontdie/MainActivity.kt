@@ -106,6 +106,10 @@ class MainActivity : Activity() {
 
     override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         if (!GamepadMap.isJoystick(event)) return super.dispatchGenericMotionEvent(event)
+        val left = StickAxes.leftStick(
+            event.getAxisValue(MotionEvent.AXIS_X),
+            event.getAxisValue(MotionEvent.AXIS_Y)
+        )
         val right = StickAxes.rightStick(
             event.getAxisValue(MotionEvent.AXIS_Z),
             event.getAxisValue(MotionEvent.AXIS_RZ),
@@ -113,14 +117,14 @@ class MainActivity : Activity() {
             event.getAxisValue(MotionEvent.AXIS_RY)
         )
         pad.onAxes(
-            event.getAxisValue(MotionEvent.AXIS_X),
+            left.first,
             event.getAxisValue(MotionEvent.AXIS_HAT_X),
             event.getAxisValue(MotionEvent.AXIS_HAT_Y),
             maxOf(
                 event.getAxisValue(MotionEvent.AXIS_RTRIGGER),
                 event.getAxisValue(MotionEvent.AXIS_GAS)
             ),
-            event.getAxisValue(MotionEvent.AXIS_Y),
+            left.second,
             right.first,
             right.second,
             maxOf(

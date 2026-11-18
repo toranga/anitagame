@@ -20,7 +20,7 @@ export ANDROID_HOME="$HOME/android-sdk"
 cp app/build/outputs/apk/release/app-release.apk ../DontDie.apk
 ```
 
-The build copies `../index.html`, `../menu-input.js`, and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.5 (versionCode 6) is 2.0 MB (2,053,945 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
+The build copies `../index.html`, `../menu-input.js`, and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.6 (versionCode 7) is 2.0 MB (2,054,457 bytes). It is signed with the same debug certificate as version 1, so it installs over the existing app.
 
 To release an update:
 

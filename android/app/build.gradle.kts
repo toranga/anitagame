@@ -19,8 +19,8 @@ android {
         applicationId = "com.toranga.dontdie"
         minSdk = 21
         targetSdk = 36
-        versionCode = versionCodeOverride ?: 6
-        versionName = "1.5"
+        versionCode = versionCodeOverride ?: 7
+        versionName = "1.6"
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
     }
 

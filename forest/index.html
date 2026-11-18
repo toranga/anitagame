@@ -1056,6 +1056,8 @@ let cameraPitch = 0;
 let heroYaw = 0;
 let camYaw = 0;
 let camPitch = 0;
+const _viewProj = new THREE.Matrix4();
+const _projV = new THREE.Vector3();
 let lookIdle = 0;
 let fp = false;
 let cycleT = 8;
@@ -1111,11 +1113,13 @@ const LS_START = "spooky-start";
 const LS_SENS = "spooky-sens";
 const LS_INVERT = "spooky-invert-y";
 const LS_INVERTX = "spooky-invert-x";
+const LS_INVERT_MOVE_X = "spooky-invert-move-x";
 const LS_FOLLOW = "spooky-follow";
 const LS_DEBUG = "spooky-pad-debug";
 let stickSens = "med";
 let invertY = false;
 let invertX = false;
+let invertMoveX = false;
 let camFollow = false;
 let pausePage = "main";
 let menuStick = 0;
@@ -1132,6 +1136,7 @@ try {
   if (sens === "low" || sens === "med" || sens === "high") stickSens = sens;
   invertY = localStorage.getItem(LS_INVERT) === "1";
   invertX = localStorage.getItem(LS_INVERTX) === "1";
+  invertMoveX = localStorage.getItem(LS_INVERT_MOVE_X) === "1";
   camFollow = localStorage.getItem(LS_FOLLOW) === "1";
   debugOn = localStorage.getItem(LS_DEBUG) === "1";
 } catch (e) {}
@@ -1570,7 +1575,8 @@ function paintPadDebug() {
     "native right X " + f(axisNum(window.__nativeRightX)) + "  Y " + f(axisNum(window.__nativeRightY)),
     "curved move L " + f(stickTarget.x) + " " + f(stickTarget.y),
     "positive right-X turns right. negative right-Y looks up.",
-    "invert X " + (invertX ? "ON" : "OFF") + "   invert Y " + (invertY ? "ON" : "OFF"),
+    "positive left-X moves to the right of the screen.",
+    "invert camera X " + (invertX ? "ON" : "OFF") + "  Y " + (invertY ? "ON" : "OFF") + "  move X " + (invertMoveX ? "ON" : "OFF"),
   ].join("\n");
 }
 function hint(text, ms) {
@@ -1739,6 +1745,7 @@ function optionActions() {
     ["Stick sensitivity: " + stickSens.toUpperCase(), () => { stickSens = order[(order.indexOf(stickSens) + 1) % 3]; save(LS_SENS, stickSens); drawOpts(); }],
     ["Invert camera Y: " + (invertY ? "ON" : "OFF"), () => { invertY = !invertY; save(LS_INVERT, invertY ? "1" : "0"); drawOpts(); }],
     ["Invert camera X: " + (invertX ? "ON" : "OFF"), () => { invertX = !invertX; save(LS_INVERTX, invertX ? "1" : "0"); drawOpts(); }],
+    ["Invert move X: " + (invertMoveX ? "ON" : "OFF"), () => { invertMoveX = !invertMoveX; save(LS_INVERT_MOVE_X, invertMoveX ? "1" : "0"); drawOpts(); }],
     ["Camera follow: " + (camFollow ? "ON" : "OFF"), () => { camFollow = !camFollow; save(LS_FOLLOW, camFollow ? "1" : "0"); drawOpts(); }],
   ];
 }
@@ -1828,7 +1835,8 @@ function updatePlay(dt) {
   if (!hostile) { stunUsed = false; stunT = 0; }
   else stunT = Math.max(0, stunT - dt);
   if (!inBush(player.x, player.z)) hiding = false;
-  let ix = stickTarget.x * sensMul() + ((keys.right ? 1 : 0) - (keys.left ? 1 : 0));
+  const moveXSign = invertMoveX ? -1 : 1;
+  let ix = (stickTarget.x * sensMul() + ((keys.right ? 1 : 0) - (keys.left ? 1 : 0))) * moveXSign;
   let iy = -stickTarget.y * sensMul() + ((keys.up ? 1 : 0) - (keys.down ? 1 : 0));
   let moveMag = Math.hypot(ix, iy);
   if (moveMag > 1) { ix /= moveMag; iy /= moveMag; moveMag = 1; }
@@ -1838,7 +1846,9 @@ function updatePlay(dt) {
   else stamina = Math.min(1, stamina + dt / 2.4);
   const speed = hiding ? 1.4 : (sprinting ? 8.1 : 4.5);
   const fx = Math.sin(camYaw), fz = Math.cos(camYaw);
-  const rx = Math.cos(camYaw), rz = -Math.sin(camYaw);
+  // The camera looks along (sin yaw, cos yaw). three.js then puts screen-right
+  // on (-cos yaw, sin yaw). The opposite pair points at the left side of the picture.
+  const rx = -Math.cos(camYaw), rz = Math.sin(camYaw);
   let targetX = 0, targetZ = 0;
   if (moving) {
     const nx = ix / moveMag, ny = iy / moveMag;
@@ -2243,6 +2253,14 @@ window.__game = {
   get padDebugOn() { return debugOn; },
   togglePadDebug() { debugOn = !debugOn; },
   cameraPos() { return { x: camera.position.x, y: camera.position.y, z: camera.position.z }; },
+  captureView() {
+    camera.updateMatrixWorld(true);
+    _viewProj.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  },
+  projectFrozen(x, y, z) {
+    _projV.set(x, y, z).applyMatrix4(_viewProj);
+    return { x: _projV.x, y: _projV.y, z: _projV.z };
+  },
   heroParts() {
     hero.updateWorldMatrix(true, true);
     const head = hero.getObjectByName("head");
