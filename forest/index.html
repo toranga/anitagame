@@ -94,6 +94,7 @@
 </script>
 <script type="module">
 import * as THREE from "three";
+import { GLTFLoader } from "./vendor/GLTFLoader.js";
 
 const TITLE = "SPOOKY FOREST";
 document.title = TITLE;
@@ -695,6 +696,7 @@ const oaks = scatter(22, 1.05);
 function instanceCones(list, mat, yScale) {
   const geo = new THREE.ConeGeometry(1, 2.2, 8);
   const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+  mesh.name = "pine-canopy";
   const d = new THREE.Object3D();
   list.forEach((t, i) => {
     const y = groundY(t.x, t.z) + 1.3 * t.s * yScale;
@@ -715,9 +717,10 @@ function instanceCones(list, mat, yScale) {
   scene.add(mesh);
   return mesh;
 }
-function instanceTrunks(list, mat) {
+function instanceTrunks(list, mat, name) {
   const geo = new THREE.CylinderGeometry(0.18, 0.26, 1.1, 6);
   const mesh = new THREE.InstancedMesh(geo, mat, list.length);
+  if (name) mesh.name = name;
   const d = new THREE.Object3D();
   list.forEach((t, i) => {
     d.position.set(t.x, groundY(t.x, t.z) + 0.45, t.z);
@@ -730,12 +733,13 @@ function instanceTrunks(list, mat) {
 const pineMat = lambert(0x1c6b3a);
 const oakMat = lambert(0x2f8f45);
 const trunkMat = lambert(0x6a4630);
-instanceTrunks(pines, trunkMat);
+instanceTrunks(pines, trunkMat, "pine-trunks");
 instanceCones(pines, pineMat, 1.7);
-instanceTrunks(oaks, trunkMat);
+instanceTrunks(oaks, trunkMat, "oak-trunks");
 {
   const geo = new THREE.SphereGeometry(1.15, 12, 8);
   const mesh = new THREE.InstancedMesh(geo, oakMat, oaks.length);
+  mesh.name = "oak-canopy";
   const d = new THREE.Object3D();
   oaks.forEach((t, i) => {
     const y = groundY(t.x, t.z) + 2.1 * t.s;
@@ -1435,6 +1439,11 @@ function applySky() {
   const scaryFace = k > 0.58;
   faces.day.visible = !scaryFace;
   faces.night.visible = scaryFace;
+  monster.traverse((obj) => {
+    if (!obj.name) return;
+    if (obj.name.indexOf("faceDay") === 0) obj.visible = !scaryFace;
+    if (obj.name.indexOf("faceNight") === 0) obj.visible = scaryFace;
+  });
   const hands = monster.userData.hands;
   const claws = k > 0.62;
   hands.soft.forEach((h) => { h.visible = !claws; });
@@ -1454,10 +1463,47 @@ function applySky() {
 function setExpression(name) {
   expression = name;
   const face = hero.getObjectByName("face");
-  if (face && HERO.textures[name]) face.material.map = HERO.textures[name];
+  if (face && face.material && HERO.textures[name]) face.material.map = HERO.textures[name];
+  const scared = name === "scared" || name === "terrified" || name === "peek";
+  hero.traverse((obj) => {
+    if (!obj.morphTargetDictionary || obj.morphTargetDictionary.fear === undefined) return;
+    obj.morphTargetInfluences[obj.morphTargetDictionary.fear] = scared ? 1 : 0;
+  });
+}
+function playClip(bag, name) {
+  if (!bag || !bag.map[name] || bag.current === name) return;
+  const next = bag.map[name];
+  const prev = bag.current && bag.map[bag.current];
+  if (prev) prev.fadeOut(0.15);
+  next.reset().fadeIn(0.15).play();
+  bag.current = name;
 }
 
 function poseHero(dt, moving, hostile) {
+  if (hero.userData.mixer) {
+    let expr = "happy";
+    const md = Math.hypot(mon.x - player.x, mon.z - player.z);
+    if (state === "scare" && scareKind === "catch") expr = "terrified";
+    else if (hiding && hostile && md < 12) expr = "peek";
+    else if (hostile && (md < 15 || mon.mode === "chase")) expr = "scared";
+    setExpression(expr);
+    const scaredNow = expr === "scared" || expr === "terrified";
+    let clip = "idle";
+    if (lassoT > 0) clip = "lasso";
+    else if (player.hop > 0.05) clip = "jump";
+    else if (hiding) clip = "crouch";
+    else if (scaredNow && moving) clip = "scared_run";
+    else if (scaredNow) clip = "scared_idle";
+    else if (moving && keys.sprint) clip = "run";
+    else if (moving) clip = "walk";
+    playClip(hero.userData.clips, clip);
+    hero.userData.mixer.update(dt);
+    const ll = hero.getObjectByName("lassoLight");
+    if (ll) ll.intensity = lassoT > 0 ? 3.2 : 0.25 + nightFactor * 2.1;
+    hero.rotation.x = 0;
+    hero.rotation.z = 0;
+    return;
+  }
   const armL = hero.getObjectByName("armL");
   const armR = hero.getObjectByName("armR");
   const legL = hero.getObjectByName("legL");
@@ -1530,6 +1576,23 @@ function poseHero(dt, moving, hostile) {
 }
 
 function poseMonster(dt, moving, hostile) {
+  if (monster.userData.mixer) {
+    let clip = "idle";
+    if (state === "scare") clip = "lunge";
+    else if (hostile && (mon.mode === "chase" || moving)) clip = "chase";
+    else if (hostile) clip = "stalk";
+    else if (mon.wave > 0) clip = "wave";
+    else if (moving) clip = "stalk";
+    playClip(monster.userData.clips, clip);
+    monster.userData.mixer.update(dt);
+    monster.traverse((obj) => {
+      if (!obj.morphTargetDictionary || obj.morphTargetDictionary.night === undefined) return;
+      obj.morphTargetInfluences[obj.morphTargetDictionary.night] = hostile ? 1 : 0;
+    });
+    monster.position.set(mon.x, groundY(mon.x, mon.z), mon.z);
+    monster.rotation.y = mon.yaw;
+    return;
+  }
   const armL = monster.getObjectByName("armL");
   const armR = monster.getObjectByName("armR");
   const legL = monster.getObjectByName("legL");
@@ -2374,6 +2437,7 @@ window.__game = {
   get fps() { return fps; },
   get gfxTier() { return gfxTier(); },
   get texturesReady() { return texturesReady; },
+  get modelsReady() { return modelsReady; },
   get resScale() { return resScale; },
   get expression() { return expression; },
   get jumpscareMode() { return jumpscareMode; },
@@ -2418,7 +2482,7 @@ window.__game = {
     const head = hero.getObjectByName("head");
     const p = new THREE.Vector3();
     head.getWorldPosition(p);
-    const tiara = head.getObjectByName("tiara");
+    const tiara = hero.getObjectByName("tiara");
     const tp = new THREE.Vector3();
     if (tiara) tiara.getWorldPosition(tp);
     return {
@@ -2496,6 +2560,84 @@ requestAnimationFrame(() => {
   frame(performance.now());
 });
 setTimeout(bootTextures, 3500);
+let modelsReady = false;
+function mountCharacter(root, gltf) {
+  while (root.children.length) root.remove(root.children[0]);
+  const model = gltf.scene;
+  root.add(model);
+  model.traverse((obj) => {
+    if (!obj.isMesh) return;
+    obj.castShadow = gfxTier() === "high";
+    obj.receiveShadow = true;
+  });
+  const mixer = new THREE.AnimationMixer(model);
+  const map = {};
+  for (const clip of gltf.animations) {
+    const action = mixer.clipAction(clip);
+    map[clip.name] = action;
+  }
+  root.userData.mixer = mixer;
+  root.userData.clips = { map, current: "" };
+  const lasso = root.getObjectByName("lasso");
+  if (lasso) {
+    root.userData.lasso = lasso;
+    const light = new THREE.PointLight(0xffc85a, 0.6, 5);
+    light.name = "lassoLight";
+    lasso.add(light);
+  }
+}
+function instanceGltf(gltf, spots, scaleMul) {
+  gltf.scene.updateMatrixWorld(true);
+  gltf.scene.traverse((src) => {
+    if (!src.isMesh) return;
+    const geo = src.geometry.clone();
+    geo.applyMatrix4(src.matrixWorld);
+    const mat = src.material;
+    if (mat) mat.side = THREE.DoubleSide;
+    const inst = new THREE.InstancedMesh(geo, mat, spots.length);
+    const d = new THREE.Object3D();
+    spots.forEach((p, i) => {
+      d.position.set(p.x, groundY(p.x, p.z), p.z);
+      d.rotation.y = (i * 1.3) % 6.2;
+      d.scale.setScalar((p.s || 1) * scaleMul);
+      d.updateMatrix();
+      inst.setMatrixAt(i, d.matrix);
+    });
+    scene.add(inst);
+  });
+}
+function loadForestModels() {
+  const loader = new GLTFLoader();
+  let left = 6;
+  const done = () => { left -= 1; if (left <= 0) modelsReady = true; };
+  const load = (url, ok) => loader.load(url, (g) => { ok(g); done(); }, undefined, done);
+  load("models/hero.glb", (g) => mountCharacter(hero, g));
+  load("models/monster.glb", (g) => {
+    mountCharacter(monster, g);
+    monster.userData.faces = {
+      day: monster.getObjectByName("faceDay") || { visible: true },
+      night: monster.getObjectByName("faceNight") || { visible: false },
+    };
+    monster.userData.hands = monster.userData.hands || { soft: [], claw: [] };
+  });
+  load("models/tree_pine.glb", (g) => {
+    instanceGltf(g, pines, 1.8);
+    const old = scene.getObjectByName("pine-canopy");
+    if (old) old.visible = false;
+    const trunksOld = scene.getObjectByName("pine-trunks");
+    if (trunksOld) trunksOld.visible = false;
+  });
+  load("models/tree_oak.glb", (g) => {
+    instanceGltf(g, oaks, 1.7);
+    const old = scene.getObjectByName("oak-canopy");
+    if (old) old.visible = false;
+    const trunksOld = scene.getObjectByName("oak-trunks");
+    if (trunksOld) trunksOld.visible = false;
+  });
+  load("models/tree_broad.glb", (g) => instanceGltf(g, oaks.filter((_, i) => i % 2 === 0), 1.5));
+  load("models/rock.glb", (g) => instanceGltf(g, ROCKS.map((r) => ({ x: r.x, z: r.z, s: 1.6 })), 1));
+}
+loadForestModels();
 window.addEventListener("error", (e) => {
   const n = document.getElementById("boot-error");
   n.style.display = "flex";
