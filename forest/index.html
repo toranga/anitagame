@@ -508,14 +508,12 @@ function pollPad() {
       try { localStorage.setItem(LS_DEBUG, debugOn ? "1" : "0"); } catch (e) {}
     }
   } else {
-    if (selectDownAt && !selectFired && performance.now() - selectDownAt < 2000) {
-      setHeld("pad", "hidetoggle", true);
-      setHeld("pad", "hidetoggle", false);
-    }
     selectDownAt = 0;
     selectFired = false;
   }
+  const wasPad = padConnected;
   padConnected = !!pad;
+  if (wasPad !== padConnected) applyChrome();
 }
 
 function curveStick(x, y, dead) {
@@ -1268,17 +1266,23 @@ const touchLayer = document.getElementById("touch");
 const portrait = document.getElementById("portrait");
 
 function save(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+function tvChrome() {
+  return !!(window.AnitaApp || window.__nativePad || padConnected);
+}
 function buttonsHidden() {
+  if (tvChrome()) return true;
   if (manualHide === true) return true;
   if (manualHide === false) return false;
-  return !isTouch || !!window.__nativePad;
+  return !isTouch;
 }
 function applyChrome() {
   const hide = buttonsHidden();
   touchLayer.style.display = hide ? "none" : "block";
+  hideBtn.style.display = tvChrome() ? "none" : "";
   hideBtn.textContent = hide ? "Show buttons" : "Hide buttons";
 }
 function toggleButtons() {
+  if (window.AnitaApp || window.__nativePad || padConnected) return;
   manualHide = !buttonsHidden();
   save(LS_HIDE, manualHide ? "hidden" : "shown");
   applyChrome();
@@ -1675,6 +1679,7 @@ function startGame() {
   transformed = startAt === "night";
   topname.style.display = "none";
   showPanel(false);
+  refreshPanel();
   hint("A jumps. X acts. B or RB lassos. LT sprints.", 3600);
 }
 let doorAngle = 0;

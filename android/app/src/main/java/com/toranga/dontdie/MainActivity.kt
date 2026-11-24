@@ -97,7 +97,7 @@ class MainActivity : Activity() {
                 KeyEvent.KEYCODE_DPAD_RIGHT -> menuPress("right")
                 KeyEvent.KEYCODE_BUTTON_A -> menuPress("confirm")
                 KeyEvent.KEYCODE_BUTTON_B -> menuPress("cancel")
-                KeyEvent.KEYCODE_BUTTON_START -> menuPress("start")
+                KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_MENU -> menuPress("start")
             }
         }
         scheduleFlush()

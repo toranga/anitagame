@@ -48,6 +48,7 @@ class PadStateTest {
         assertEquals(GamepadMap.R2, GamepadMap.buttonIndex(KeyEvent.KEYCODE_BUTTON_R2))
         assertEquals(GamepadMap.START, GamepadMap.buttonIndex(KeyEvent.KEYCODE_BUTTON_START))
         assertEquals(GamepadMap.START, GamepadMap.buttonIndex(KeyEvent.KEYCODE_BUTTON_START))
+        assertEquals(GamepadMap.START, GamepadMap.buttonIndex(KeyEvent.KEYCODE_MENU))
         assertEquals(null, GamepadMap.buttonIndex(KeyEvent.KEYCODE_DPAD_CENTER))
         org.junit.Assert.assertTrue(GamepadMap.isCenter(KeyEvent.KEYCODE_DPAD_CENTER))
         assertEquals(GamepadMap.SELECT, GamepadMap.buttonIndex(KeyEvent.KEYCODE_BUTTON_SELECT))

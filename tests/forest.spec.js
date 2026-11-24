@@ -732,3 +732,54 @@ test('right stick turns the view right and up looks up', async ({ browser }) => 
   expect(errors).toEqual([]);
   await context.close();
 });
+
+test('the TV app hides the button chip and Start opens the pause menu', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, baseURL: 'http://127.0.0.1:4173' });
+  await context.addInitScript(() => {
+    window.AnitaApp = { quit() {} };
+  });
+  const page = await context.newPage();
+  const errors = track(page);
+  await page.goto('/forest/index.html?native=1');
+  await page.waitForFunction(() => window.__game && window.__game.ready && window.__game.state === 'title');
+  await expect(page.locator('#hide-buttons')).toBeHidden();
+  await expect(page.locator('#touch')).toBeHidden();
+
+  await page.evaluate(() => window.__menuPress('confirm'));
+  await page.waitForFunction(() => window.__game.state === 'play' && window.__game.modelsReady);
+  await page.waitForTimeout(400);
+  await expect(page.locator('#hearts')).toBeVisible();
+  await expect(page.locator('#hide-buttons')).toBeHidden();
+  await expect(page.locator('#touch')).toBeHidden();
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-hud-tv.png') });
+
+  const press = async (index, down) => {
+    await page.evaluate(([i, on]) => {
+      const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+      if (on) buttons[i] = { pressed: true, value: 1 };
+      window.__nativeButtons = buttons;
+    }, [index, down]);
+  };
+  await press(9, true);
+  await page.waitForFunction(() => window.__game.state === 'pause');
+  await press(9, false);
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__game.state)).toBe('pause');
+  await expect(page.locator('#opts .focus')).toHaveText('Resume');
+  const labels = await page.locator('#opts button').allTextContents();
+  expect(labels).toEqual(['Resume', 'Restart', 'Options', 'Back to game menu', 'Quit app']);
+  await expect(page.locator('#hide-buttons')).toBeHidden();
+  await expect(page.locator('#touch')).toBeHidden();
+  await page.screenshot({ path: path.join(ARTIFACTS, 'forest-pause-tv.png') });
+
+  await press(8, true);
+  await page.waitForTimeout(250);
+  await press(8, false);
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => window.__game.state)).toBe('pause');
+  await expect(page.locator('#touch')).toBeHidden();
+  await expect(page.locator('#hide-buttons')).toBeHidden();
+
+  expect(errors).toEqual([]);
+  await context.close();
+});

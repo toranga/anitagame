@@ -47,7 +47,7 @@ object GamepadMap {
         KeyEvent.KEYCODE_BUTTON_R2 -> R2
         KeyEvent.KEYCODE_BUTTON_THUMBL -> L3
         KeyEvent.KEYCODE_BUTTON_THUMBR -> R3
-        KeyEvent.KEYCODE_BUTTON_START -> START
+        KeyEvent.KEYCODE_BUTTON_START, KeyEvent.KEYCODE_MENU -> START
         KeyEvent.KEYCODE_BUTTON_SELECT -> SELECT
         KeyEvent.KEYCODE_DPAD_LEFT -> DPAD_LEFT
         KeyEvent.KEYCODE_DPAD_RIGHT -> DPAD_RIGHT
