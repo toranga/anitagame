@@ -1,6 +1,6 @@
 {
-  "versionCode": 11,
-  "versionName": "1.9",
+  "versionCode": 12,
+  "versionName": "2.0",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "The Show buttons chip is hidden on the TV and when a controller is connected. Start opens the pause menu and leaves the touch buttons alone."
+  "notes": "The lasso is a golden rope that spins, throws, and pulls lanterns in. The lanterns are iron and glass with a flickering flame."
 }
