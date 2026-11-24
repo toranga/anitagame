@@ -19,16 +19,28 @@ android {
         applicationId = "com.toranga.dontdie"
         minSdk = 21
         targetSdk = 36
-        versionCode = versionCodeOverride ?: 8
-        versionName = "1.7"
+        versionCode = versionCodeOverride ?: 10
+        versionName = "1.8"
         buildConfigField("String", "UPDATE_MANIFEST_URL", "\"$updateManifestUrl\"")
     }
 
+    signingConfigs {
+        create("anitagames") {
+            // Public hobby key. Password and alias are in android/README.md.
+            storeFile = rootProject.file("keystore/anitagames.jks")
+            storePassword = "anitagames"
+            keyAlias = "anitagames"
+            keyPassword = "anitagames"
+        }
+    }
+
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("anitagames")
+        }
         release {
             isMinifyEnabled = false
-            // Sideload build. The debug keystore lives outside the repo (~/.android).
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("anitagames")
         }
     }
 

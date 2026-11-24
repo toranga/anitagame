@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.7",
+  "versionCode": 10,
+  "versionName": "1.8",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "Pushing the right stick right turns the view right."
+  "notes": "SPOOKY FOREST has new graphics: a costumed heroine, a red monster, and a forest of trees, rocks, and logs. This build uses a new signing key, so uninstall the old app once before installing."
 }
