@@ -229,7 +229,7 @@ function gfxTier() {
 function gfxProfile() {
   const tier = gfxTier();
   if (tier === "low") return { shadow: 0, grass: 0, pixel: 0.6, fireflies: 0.4 };
-  if (tier === "high") return { shadow: 256, grass: 1400, pixel: 1, fireflies: 1 };
+  if (tier === "high") return { shadow: 256, grass: 0, pixel: 1, fireflies: 1 };
   return { shadow: 0, grass: 0, pixel: 0.55, fireflies: 0.75 };
 }
 function lambert(color, extra) {
@@ -760,6 +760,7 @@ instanceTrunks(oaks, trunkMat, "oak-trunks");
   scene.add(mesh);
 }
 const bushMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), lambert(0x174d28), BUSHES.length);
+bushMesh.name = "bush-standins";
 {
   const d = new THREE.Object3D();
   BUSHES.forEach((b, i) => {
@@ -2601,14 +2602,7 @@ function instanceGltf(gltf, spots, scaleMul, allow) {
     const mat = src.material;
     if (mat) {
       mat.side = THREE.DoubleSide;
-      const label = (mat.name || "") + " " + (src.name || "");
-      if (/leaf/i.test(label)) {
-        mat.color.set(0x2f6a30);
-        mat.alphaTest = 0.35;
-        mat.transparent = false;
-      } else if (mat.color) {
-        mat.color.set(0x6b4a32);
-      }
+      if (mat.alphaMap || mat.transparent) mat.alphaTest = 0.4;
     }
     const inst = new THREE.InstancedMesh(geo, mat, spots.length);
     const d = new THREE.Object3D();
@@ -2625,65 +2619,63 @@ function instanceGltf(gltf, spots, scaleMul, allow) {
 function loadForestModels() {
   const loader = new GLTFLoader();
   const detailed = gfxTier() === "high";
-  let left = detailed ? 6 : 2;
+  const far = [];
+  for (let i = 0; i < 36; i++) {
+    const ang = (i / 36) * Math.PI * 2;
+    const rad = 36 + (i % 4) * 3;
+    const x = Math.cos(ang) * rad;
+    const z = 42 + Math.sin(ang) * rad * 0.8;
+    if (pathDist(x, z) < 6) continue;
+    far.push({ x, z, s: 1.15 });
+  }
+  const grassSpots = [];
+  for (let i = 0; i < (detailed ? 70 : 24); i++) {
+    const x = (Math.sin(i * 12.9) * 0.5) * 46;
+    const z = (i * 1.7) % 96;
+    if (pathDist(x, z) < 2.2) continue;
+    grassSpots.push({ x, z, s: 0.8 + (i % 4) * 0.15 });
+  }
+  let left = 12;
   const done = () => { left -= 1; if (left <= 0) modelsReady = true; };
   const load = (url, ok) => loader.load(url, (g) => { ok(g); done(); }, undefined, done);
+  const hide = (name) => { const o = scene.getObjectByName(name); if (o) o.visible = false; };
   load("models/hero.glb", (g) => mountCharacter(hero, g));
   load("models/monster.glb", (g) => {
     mountCharacter(monster, g);
+    monster.traverse((obj) => {
+      if (obj.name && obj.name.indexOf("faceDay") === 0) obj.name = "eye" + obj.name.slice(7);
+    });
     monster.userData.faces = {
-      day: monster.getObjectByName("faceDay") || { visible: true },
-      night: monster.getObjectByName("faceNight") || { visible: false },
+      day: monster.getObjectByName("eyeeyeL") || { visible: true },
+      night: monster.getObjectByName("faceNightmouth") || { visible: false },
     };
     monster.userData.hands = monster.userData.hands || { soft: [], claw: [] };
   });
-  if (!detailed) {
-    /* Medium and Low keep the lighter trees so the stick tests and the Shield stay smooth. */
-  } else {
   load("models/tree_pine.glb", (g) => {
-    instanceGltf(g, pines, 1.8);
-    instanceGltf(g, far.slice(0, 18), 1.5);
-    const old = scene.getObjectByName("pine-canopy");
-    if (old) old.visible = false;
-    const trunksOld = scene.getObjectByName("pine-trunks");
-    if (trunksOld) trunksOld.visible = false;
+    instanceGltf(g, pines.filter((_, i) => i % 2 === 0), 1);
+    instanceGltf(g, far.filter((_, i) => i % 2 === 0), 1.1);
+    hide("pine-canopy");
+    hide("pine-trunks");
+  });
+  load("models/tree_pine2.glb", (g) => {
+    instanceGltf(g, pines.filter((_, i) => i % 2 === 1), 1);
+    instanceGltf(g, far.filter((_, i) => i % 2 === 1), 1.05);
   });
   load("models/tree_oak.glb", (g) => {
-    instanceGltf(g, oaks, 1.7);
-    const old = scene.getObjectByName("oak-canopy");
-    if (old) old.visible = false;
-    const trunksOld = scene.getObjectByName("oak-trunks");
-    if (trunksOld) trunksOld.visible = false;
+    instanceGltf(g, oaks.filter((_, i) => i % 2 === 0), 1);
+    hide("oak-canopy");
+    hide("oak-trunks");
   });
-  if (detailed) load("models/tree_broad.glb", (g) => instanceGltf(g, oaks.filter((_, i) => i % 2 === 0), 1.5));
+  load("models/tree_broad.glb", (g) => instanceGltf(g, oaks.filter((_, i) => i % 2 === 1), 1));
   load("models/rock.glb", (g) => {
-    instanceGltf(g, ROCKS.map((r) => ({ x: r.x, z: r.z, s: 2.2 })), 1);
-    const old = scene.getObjectByName("rock-standins");
-    if (old) old.visible = false;
+    instanceGltf(g, ROCKS.filter((_, i) => i % 2 === 0).map((r) => ({ x: r.x, z: r.z, s: 1.4 })), 1);
+    hide("rock-standins");
   });
-  const far = [];
-  for (let i = 0; i < 80; i++) {
-    const ang = (i / 80) * Math.PI * 2;
-    const rad = 34 + (i % 4) * 4;
-    const x = Math.cos(ang) * rad;
-    const z = 42 + Math.sin(ang) * rad * 0.85;
-    if (pathDist(x, z) < 6) continue;
-    far.push({ x, z, s: 1.3 + (i % 3) * 0.25 });
-  }
-  const logGeo = new THREE.CylinderGeometry(0.16, 0.2, 1.8, 6);
-  logGeo.rotateZ(Math.PI / 2);
-  const logMesh = new THREE.InstancedMesh(logGeo, lambert(0x5c4030), 6);
-  const logSpots = [{ x: 5.2, z: 24 }, { x: -6.4, z: 41 }, { x: 7.1, z: 63 }, { x: -4.8, z: 78 }, { x: 9, z: 52 }, { x: -8.2, z: 18 }];
-  const ld = new THREE.Object3D();
-  logSpots.forEach((p, i) => {
-    ld.position.set(p.x, groundY(p.x, p.z) + 0.18, p.z);
-    ld.rotation.y = i * 0.8;
-    ld.updateMatrix();
-    logMesh.setMatrixAt(i, ld.matrix);
-  });
-  logMesh.instanceMatrix.needsUpdate = true;
-  scene.add(logMesh);
-  }
+  load("models/rock2.glb", (g) => instanceGltf(g, ROCKS.filter((_, i) => i % 2 === 1).map((r) => ({ x: r.x, z: r.z, s: 1.2 })), 1));
+  load("models/grass.glb", (g) => instanceGltf(g, grassSpots, 1));
+  load("models/log.glb", (g) => instanceGltf(g, [{ x: 5.2, z: 24, s: 1.3 }, { x: -6.4, z: 41, s: 1.1 }, { x: 7.1, z: 63, s: 1.2 }, { x: -4.8, z: 78, s: 1 }], 1));
+  load("models/stump.glb", (g) => instanceGltf(g, [{ x: -8.2, z: 18, s: 1 }, { x: 9, z: 52, s: 1.1 }, { x: -3.5, z: 66, s: 0.9 }], 1));
+  load("models/bush.glb", (g) => { instanceGltf(g, BUSHES.map((b) => ({ x: b.x, z: b.z, s: 1 })), 1); hide("bush-standins"); });
 }
 setTimeout(loadForestModels, 6000);
 window.addEventListener("error", (e) => {
