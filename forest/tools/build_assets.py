@@ -483,9 +483,9 @@ def shot(path, loc):
 def build_trees():
     bpy.ops.preferences.addon_enable(module="add_curve_sapling")
     specs = [
-        ("tree_pine", dict(leafShape="hex", levels=2, scale=6.0, seed=2, baseSize=0.4, bevel=True, showLeaves=True, prune=True)),
-        ("tree_oak", dict(leafShape="hex", levels=2, scale=5.2, seed=4, baseSize=0.2, bevel=True, showLeaves=True, prune=False)),
-        ("tree_broad", dict(leafShape="rect", levels=2, scale=4.6, seed=8, baseSize=0.18, bevel=True, showLeaves=True, prune=True)),
+        ("tree_pine", dict(leafShape="hex", levels=3, scale=7.0, seed=2, baseSize=0.35, bevel=True, showLeaves=True, prune=True, leafScale=2.4, leafScaleX=1.1)),
+        ("tree_oak", dict(leafShape="hex", levels=3, scale=6.2, seed=4, baseSize=0.22, bevel=True, showLeaves=True, prune=False, leafScale=2.8, leafScaleX=1.3)),
+        ("tree_broad", dict(leafShape="rect", levels=3, scale=5.6, seed=8, baseSize=0.2, bevel=True, showLeaves=True, prune=True, leafScale=3.0, leafScaleX=1.4)),
     ]
     for name, params in specs:
         wipe()
@@ -505,12 +505,17 @@ def build_trees():
             if obj.type != "MESH":
                 continue
             smooth(obj)
-            obj.data.materials.clear()
-            obj.data.materials.append(leaf if "leaf" in obj.name.lower() else bark)
+            obj.data = obj.data.copy()
             faces = len(obj.data.polygons)
-            if faces > 1800:
-                decimate(obj, 1800)
-            print(name, obj.name, len(obj.data.polygons))
+            use_leaf = obj.name.lower().startswith("leav")
+            limit = 1400 if use_leaf else 1800
+            if faces > limit:
+                decimate(obj, limit)
+            obj.data.materials.clear()
+            obj.data.materials.append(leaf if use_leaf else bark)
+            for poly in obj.data.polygons:
+                poly.material_index = 0
+            print(name, obj.name, len(obj.data.polygons), obj.data.materials[0].name)
             meshes.append(obj)
         if not meshes:
             continue
