@@ -1882,9 +1882,11 @@ function refreshPanel() {
   document.getElementById("hud").style.display = state === "title" ? "none" : "block";
   topname.style.display = state === "title" ? "block" : "none";
   if (state === "title") {
-    heading.textContent = "";
-    blurb.textContent = "You are the Hero, lost in the woods. Collect 7 lanterns and reach the gate. The monster is friendly by day.";
-    help.innerHTML = CONTROLS_HELP;
+    heading.textContent = pausePage === "credits" ? "CREDITS" : "";
+    blurb.textContent = pausePage === "credits"
+      ? "Characters and animations, trees, rocks, grass and logs by Quaternius (CC0). Ground, bark and rock textures by ambientCG (CC0)."
+      : "You are the Hero, lost in the woods. Collect 7 lanterns and reach the gate. The monster is friendly by day.";
+    help.innerHTML = pausePage === "credits" ? "B goes back" : CONTROLS_HELP;
     prompt.textContent = controllerPrompt();
     drawOpts();
   } else if (state === "pause") {
@@ -1951,11 +1953,13 @@ function controllerPrompt() {
 }
 function titleActions() {
   if (pausePage === "options") return optionActions();
+  if (pausePage === "credits") return [["Back", () => { pausePage = "root"; menuRow = 4; drawOpts(); }]];
   return [
     ["Jumpscares: " + (jumpscareMode === "mild" ? "MILD" : "SCARY"), () => { jumpscareMode = jumpscareMode === "mild" ? "scary" : "mild"; save(LS_SCARE, jumpscareMode); drawOpts(); }],
     ["Start at: " + (startAt === "night" ? "NIGHT" : "DAY"), () => { startAt = startAt === "night" ? "day" : "night"; save(LS_START, startAt); drawOpts(); }],
     ["START GAME", startGame],
     ["Options", () => { pausePage = "options"; menuRow = 0; drawOpts(); }],
+    ["Credits", () => { pausePage = "credits"; menuRow = 0; refreshPanel(); }],
   ];
 }
 function endActions() {
@@ -2001,9 +2005,10 @@ function driveMenu(ev) {
   else if (ev.up || ev.left) dir = -1;
   if (dir) { menuRow = (menuRow + dir + count) % count; drawOpts(); }
   if (ev.cancel) {
-    if (pausePage === "options") {
+    if (pausePage === "options" || pausePage === "credits") {
+      const backRow = pausePage === "credits" ? 4 : 3;
       pausePage = "root";
-      menuRow = state === "title" ? 3 : 2;
+      menuRow = state === "title" ? backRow : 2;
       drawOpts();
     } else if (state === "pause") resumeGame();
     return;

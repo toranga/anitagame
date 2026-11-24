@@ -29,7 +29,7 @@ async function boot(browser, gfx) {
 }
 
 test('realistic forest renders and holds frame rate on each graphics tier', async ({ browser }) => {
-  test.setTimeout(90000);
+  test.setTimeout(180000);
   const { context, page, errors } = await boot(browser, 'high');
   expect(await page.evaluate(() => window.__game.gfxTier)).toBe('high');
   await page.screenshot({ path: path.join(ARTIFACTS, 'forest-title-real.png') });

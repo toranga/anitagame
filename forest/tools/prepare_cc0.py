@@ -239,14 +239,14 @@ def build_hero():
     boot = mat("boot", (0.55, 0.06, 0.08), 0.4)
     cape = mat("cape", (0.62, 0.06, 0.1), 0.6)
     lasso = mat("lasso", (1.0, 0.82, 0.3), 0.2, emit=3.0)
-    primitive("uv", "bodice", red, "spine_03", (chest.x, chest.y - 0.02, chest.z), (0.16, 0.11, 0.16))
-    primitive("cone", "skirt", blue, "pelvis", (hips.x, hips.y, hips.z - 0.16), (0.2, 0.2, 0.28), (math.pi, 0, 0))
+    primitive("uv", "bodice", red, "spine_03", (chest.x, chest.y - 0.04, chest.z), (0.18, 0.12, 0.17))
+    primitive("cone", "skirt", blue, "pelvis", (hips.x, hips.y, hips.z - 0.2), (0.28, 0.28, 0.36), (math.pi, 0, 0))
     for side, bone in (("L", "lowerarm_l"), ("R", "lowerarm_r")):
         p = bone_pos(arm, bone)
         primitive("cyl", "bracer" + side, gold, bone, (p.x, p.y, p.z), (0.045, 0.045, 0.08))
     for side, bone in (("L", "foot_l"), ("R", "foot_r")):
         p = bone_pos(arm, bone)
-        primitive("uv", "boot" + side, boot, bone, (p.x, p.y - 0.02, p.z + 0.04), (0.05, 0.09, 0.05))
+        primitive("uv", "boot" + side, boot, bone, (p.x, p.y - 0.04, p.z + 0.02), (0.055, 0.1, 0.08))
     primitive("plane", "cape", cape, "spine_03", (chest.x, chest.y + 0.08, chest.z - 0.15), (0.42, 1, 0.7), (math.pi / 2, 0, 0))
     primitive("torus", "tiara", gold, "Head", (head.x, head.y - 0.02, head.z + 0.08), (1.15, 0.75, 0.45))
     primitive("uv", "star", mat("starcol", (0.8, 0.08, 0.1), 0.3), "Head", (head.x, head.y - 0.1, head.z + 0.1), (0.028, 0.02, 0.028))
@@ -275,46 +275,46 @@ def build_monster():
     print("monster bones", [b.name for b in next(o for o in new if o.type == "ARMATURE").data.bones][:40])
     arm = next(o for o in new if o.type == "ARMATURE")
     roots = [o for o in new if o.parent is None]
-    fit_height(roots, 2.5)
+    fit_height(roots, 2.7)
+    for obj in roots:
+        obj.scale.x *= 0.5
+        obj.scale.y *= 0.5
+    bpy.ops.object.select_all(action="DESELECT")
+    for obj in roots:
+        obj.select_set(True)
+    bpy.context.view_layer.objects.active = roots[0]
+    bpy.ops.object.transform_apply(scale=True)
     paint((0.78, 0.08, 0.09))
     bpy.context.view_layer.update()
     names = {b.name.lower(): b.name for b in arm.data.bones}
     head_name = names.get("head") or names.get("head_end") or next((n for n in names if "head" in n), None)
     print("head bone", head_name, "height", mesh_bounds(meshes())[1].z)
     if head_name:
-        head = bone_pos(arm, head_name)
         white = mat("eyeWhite", (0.95, 0.95, 0.93), 0.2)
         dark = mat("pupil", (0.05, 0.02, 0.02), 0.3)
-        hair = mat("spikes", (0.05, 0.04, 0.04), 0.6)
+        hairm = mat("spikes", (0.05, 0.04, 0.04), 0.6)
         night = mat("nightMouth", (0.15, 0.02, 0.03), 0.4)
-        for s, tag in ((1, "L"), (-1, "R")):
-            eye = bpy.ops
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.09, location=(head.x + s * 0.07, head.y - 0.12, head.z + 0.02), segments=12, ring_count=8)
+
+        def pin(kind, name, material, loc, radius=0.08):
+            if kind == "cone":
+                bpy.ops.mesh.primitive_cone_add(radius1=radius, depth=radius * 3, location=(0, 0, 0), vertices=6)
+            else:
+                bpy.ops.mesh.primitive_uv_sphere_add(radius=radius, location=(0, 0, 0), segments=12, ring_count=8)
             obj = bpy.context.active_object
-            obj.name = "faceDayeye" + tag
-            obj.data.materials.append(white)
-            stick(obj, arm, head_name)
-            bpy.ops.mesh.primitive_uv_sphere_add(radius=0.035, location=(head.x + s * 0.07, head.y - 0.19, head.z + 0.02), segments=10, ring_count=6)
-            pup = bpy.context.active_object
-            pup.name = "faceDaypup" + tag
-            pup.data.materials.append(dark)
-            stick(pup, arm, head_name)
-        for i, ang in enumerate((-0.5, -0.2, 0.15, 0.45)):
-            bpy.ops.mesh.primitive_cone_add(radius1=0.035, depth=0.16, location=(head.x + math.sin(ang) * 0.08, head.y + 0.02, head.z + 0.16), vertices=6)
-            spike = bpy.context.active_object
-            spike.name = "spike" + str(i)
-            spike.rotation_euler.x = -0.4
-            bpy.ops.object.transform_apply(rotation=True)
-            spike.data.materials.append(hair)
-            stick(spike, arm, head_name)
-        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.06, location=(head.x, head.y - 0.14, head.z - 0.06), segments=10, ring_count=6)
-        mouth = bpy.context.active_object
-        mouth.name = "faceNightmouth"
-        mouth.scale = (1.3, 0.35, 0.45)
-        bpy.ops.object.transform_apply(scale=True)
-        mouth.data.materials.append(night)
-        mouth.hide_render = False
-        stick(mouth, arm, head_name)
+            obj.name = name
+            obj.data.materials.append(material)
+            obj.parent = arm
+            obj.parent_type = "BONE"
+            obj.parent_bone = head_name
+            obj.location = loc
+            return obj
+
+        for s, tag in ((1, "L"), (-1, "R")):
+            pin("uv", "faceDayeye" + tag, white, (s * 0.08, 0.12, 0.06), 0.07)
+            pin("uv", "faceDaypup" + tag, dark, (s * 0.08, 0.16, 0.06), 0.03)
+        for i, x in enumerate((-0.08, -0.02, 0.04, 0.1)):
+            pin("cone", "spike" + str(i), hairm, (x, 0.02, 0.16), 0.035)
+        pin("uv", "faceNightmouth", night, (0, 0.14, -0.02), 0.05)
     # Map whatever clips the pack shipped to the names the game already plays.
     aliases = {
         "idle": ("idle",),

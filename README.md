@@ -47,7 +47,7 @@ On the title screen, a connected controller changes the prompt to "Press A to st
 
 ## Play on NVIDIA Shield
 
-The browser on Android TV turns the D-pad into a mouse and treats B as Back. The native app sends those buttons to the game instead. It is landscape, fullscreen, and works offline. The download is 2.2 MB (2,269,230 bytes), versionCode 9. Options include a Graphics setting: Auto, Low, Medium, or High. Auto is Medium, and the picture scales to hold a steady frame rate.
+The browser on Android TV turns the D-pad into a mouse and treats B as Back. The native app sends those buttons to the game instead. It is landscape, fullscreen, and works offline. Options include a Graphics setting: Auto, Low, Medium, or High. Auto is Medium, and the picture scales to hold a steady frame rate. The forest models are CC0 packs from Quaternius and ambientCG. See `forest/CREDITS.md`.
 
 1. On the Shield, install the free **Downloader** app by AFTVnews from the Play Store.
 2. Allow Downloader to install unknown apps when Android asks (or in Settings, Apps, Downloader, Install unknown apps).
