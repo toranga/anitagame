@@ -5,3 +5,4 @@ app/build/
 app/src/main/assets/index.html
 *.keystore
 *.jks
+!keystore/anitagames.jks

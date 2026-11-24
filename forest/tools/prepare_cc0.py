@@ -426,14 +426,14 @@ def make_boot(arm, side, material, gold):
         return out
 
     shaft = [
-        ring(knee, 0.075),
-        ring((knee + ankle) * 0.5, 0.068),
-        ring(ankle, 0.07),
+        ring(knee, 0.092),
+        ring((knee + ankle) * 0.5, 0.084),
+        ring(ankle, 0.086),
     ]
     foot_rings = [
-        ring(ankle, 0.062),
-        ring((ankle + toe) * 0.5, 0.058, -0.01),
-        ring(Vector((toe.x, toe.y - 0.02, max(0.03, toe.z))), 0.045, -0.01),
+        ring(Vector((ankle.x, ankle.y - 0.02, 0.055)), 0.08),
+        ring(Vector((toe.x, toe.y - 0.05, 0.05)), 0.072),
+        ring(Vector((toe.x, toe.y - 0.11, 0.04)), 0.055),
     ]
     rings = shaft + foot_rings
     for a, b in zip(rings, rings[1:]):
@@ -698,7 +698,7 @@ def build_monster():
                 (sign * 0.62, center.y - 0.12, shoulder_z - 0.85),
                 (sign * 0.72, center.y - 0.16, 0.02),
             ],
-            0.06, dark,
+            0.11, dark,
         )
     head_bone = "Head2" if "Head2" in arm.data.bones else "Head"
     head = center
