@@ -8,7 +8,7 @@ A fullscreen landscape app for NVIDIA Shield. It opens a picker for DON'T DIE an
 - Android SDK with platform 36 and build-tools 36.0.0
 - `ANDROID_HOME` pointing at that SDK
 
-The signing key is checked in on purpose at `keystore/anitagames.jks`. This is a kids' hobby app, so the key is public and every build can sign the same way. Alias `anitagames`, store password `anitagames`, key password `anitagames`. Both the debug and release build types use it. Version 1.8 (versionCode 10) is the first build with this key. The previous APK used the machine debug key, so the Shield needs one uninstall before this one will install.
+The signing key is checked in on purpose at `keystore/anitagames.jks`. This is a kids' hobby app, so the key is public and every build can sign the same way. Alias `anitagames`, store password `anitagames`, key password `anitagames`. Both the debug and release build types use it. Version 1.8 (versionCode 10) was the first build with this key. Version 1.9 (versionCode 11) uses the same key, so it installs over 1.8.
 
 ## Build
 
@@ -20,7 +20,7 @@ export ANDROID_HOME="$HOME/android-sdk"
 cp app/build/outputs/apk/release/app-release.apk ../DontDie.apk
 ```
 
-The build copies `../index.html`, `../menu-input.js`, and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.8 (versionCode 10) is 3.2 MB (3,168,782 bytes). Its certificate SHA-256 is `5d25d7521b7d38ba9861aff843f61063b4cd0d63f64b5c22e09b7b9439b38308`.
+The build copies `../index.html`, `../menu-input.js`, and `../forest/` into the APK, then you copy the finished file to `DontDie.apk` at the repository root. Version 1.9 (versionCode 11) is 3.2 MB (3,168,873 bytes). Its certificate SHA-256 is `5d25d7521b7d38ba9861aff843f61063b4cd0d63f64b5c22e09b7b9439b38308`.
 
 To release an update:
 

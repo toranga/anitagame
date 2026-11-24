@@ -1,6 +1,6 @@
 {
-  "versionCode": 10,
-  "versionName": "1.8",
+  "versionCode": 11,
+  "versionName": "1.9",
   "apk": "https://toranga.github.io/anitagame/DontDie.apk",
-  "notes": "SPOOKY FOREST has new graphics: a costumed heroine, a red monster, and a forest of trees, rocks, and logs. This build uses a new signing key, so uninstall the old app once before installing."
+  "notes": "The Show buttons chip is hidden on the TV and when a controller is connected. Start opens the pause menu and leaves the touch buttons alone."
 }

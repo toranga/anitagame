@@ -64,7 +64,11 @@ try {
   if (saved === 'hidden') manualHide = true;
   else if (saved === 'shown') manualHide = false;
 } catch (e) {}
+function tvChrome(){
+  return !!(window.AnitaApp || window.__nativePad || padConnected);
+}
 function gameplayButtonsHidden(){
+  if (tvChrome()) return true;
   if (manualHide === true) return true;
   if (manualHide === false) return false;
   if (autoHide) return true;
@@ -73,6 +77,7 @@ function gameplayButtonsHidden(){
 function applyTouchChrome(){
   const hidden = gameplayButtonsHidden();
   touchLayer.style.display = hidden ? 'none' : 'block';
+  toggleBtn.style.display = tvChrome() ? 'none' : '';
   const label = hidden ? 'Show buttons' : 'Hide buttons';
   if (toggleBtn.textContent !== label) toggleBtn.textContent = label;
   toggleBtn.setAttribute('aria-pressed', hidden ? 'true' : 'false');
@@ -91,6 +96,7 @@ function applyTouchChrome(){
   toggleBtn.style.right = Math.round(10 * s) + 'px';
 }
 function toggleButtons(){
+  if (window.AnitaApp || window.__nativePad || padConnected) return;
   manualHide = !gameplayButtonsHidden();
   try { localStorage.setItem(LS_BUTTONS, manualHide ? 'hidden' : 'shown'); } catch (e) {}
   applyTouchChrome();
@@ -278,8 +284,8 @@ function pollGamepad(){
   // A or Start begins from the title. During a pause menu, A chooses the row and Start closes it.
   setHeld('pad', 'enter', paused ? a : (a || start));
   setHeld('pad', 'pause', start);
-  // Back/Select hides or shows the on-screen buttons. Sound stays on M.
-  setHeld('pad', 'hidetoggle', padButton(pad, 8));
+  // A connected controller never toggles the on-screen buttons. H still does on a phone.
+  setHeld('pad', 'hidetoggle', false);
 }
 
 let gestured = false;
@@ -303,7 +309,7 @@ function onTouch(e){
   if (e.target === toggleBtn || (e.target && toggleBtn.contains && toggleBtn.contains(e.target))) return;
   if (e.cancelable) e.preventDefault();
   firstGesture();
-  if (manualHide === null && autoHide){ autoHide = false; applyTouchChrome(); }
+  if (manualHide === null && autoHide && !tvChrome()){ autoHide = false; applyTouchChrome(); }
   const active = new Set();
   for (const t of e.touches){ const k = btnAt(t.clientX, t.clientY); if (k) active.add(k); }
   let tapOutside = false;

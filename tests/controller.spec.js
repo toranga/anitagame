@@ -78,7 +78,7 @@ test('title screen shows controller prompt and hides buttons when a pad is conne
   const { context, page, errors } = await openGame(browser, { pad: true });
   await expect.poll(() => page.evaluate(() => window.__game.padConnected)).toBe(true);
   await expect.poll(() => page.evaluate(() => window.__game.buttonsHidden)).toBe(true);
-  await expect(page.locator('#hide-buttons')).toHaveText('Show buttons');
+  await expect(page.locator('#hide-buttons')).toBeHidden();
   await expect(page.locator('#game [data-k="jump"]')).toBeHidden();
   await shotWhenPromptVisible(page, 'title-controller.png');
   expect(errors).toEqual([]);
@@ -159,11 +159,21 @@ test('gamepad plays the game and one-shot buttons do not repeat', async ({ brows
 
   expect(await page.evaluate(() => window.__game.buttonsHidden)).toBe(true);
   await page.evaluate(() => window.__pad.set(8, true));
-  await page.waitForFunction(() => !window.__game.buttonsHidden);
   await page.waitForTimeout(250);
-  expect(await page.evaluate(() => window.__game.buttonsHidden)).toBe(false);
-  expect(await page.evaluate(() => localStorage.getItem('dontdie-hide-buttons'))).toBe('shown');
+  expect(await page.evaluate(() => window.__game.buttonsHidden)).toBe(true);
+  await expect(page.locator('#hide-buttons')).toBeHidden();
   await page.evaluate(() => window.__pad.set(8, false));
+  await page.evaluate(() => window.__pad.set(9, true));
+  await page.waitForFunction(() => window.__game.paused);
+  expect(await page.evaluate(() => window.__game.pauseRow)).toBe(0);
+  expect(await page.evaluate(() => window.__game.pauseLabels()[0])).toBe('Resume');
+  await expect(page.locator('#hide-buttons')).toBeHidden();
+  await expect(page.locator('#game [data-k="jump"]')).toBeHidden();
+  await page.evaluate(() => window.__pad.set(9, false));
+  await page.waitForTimeout(80);
+  await page.evaluate(() => window.__pad.set(9, true));
+  await page.waitForFunction(() => !window.__game.paused);
+  await page.evaluate(() => window.__pad.set(9, false));
 
   const xKey = await page.evaluate(() => window.__game.player.x);
   await page.keyboard.down('ArrowRight');
@@ -268,35 +278,21 @@ test('a saved choice overrides auto-hide, and a touch brings buttons back', asyn
   const shown = await openGame(browser, { touch: true, pad: true, stored: 'shown' });
   expect(await shown.page.evaluate(() => window.__game.isTouch)).toBe(true);
   await expect.poll(() => shown.page.evaluate(() => window.__game.padConnected)).toBe(true);
-  expect(await shown.page.evaluate(() => window.__game.buttonsHidden)).toBe(false);
-  await expect(shown.page.locator('#game [data-k="left"]')).toBeVisible();
+  expect(await shown.page.evaluate(() => window.__game.buttonsHidden)).toBe(true);
+  await expect(shown.page.locator('#hide-buttons')).toBeHidden();
+  await expect(shown.page.locator('#game [data-k="left"]')).toBeHidden();
   expect(shown.errors).toEqual([]);
   await shown.context.close();
 
-  const hidden = await openGame(browser, { touch: true, pad: true });
-  await expect.poll(() => hidden.page.evaluate(() => window.__game.buttonsHidden)).toBe(true);
-  await expect(hidden.page.locator('#game [data-k="jump"]')).toBeHidden();
-  await hidden.page.evaluate(() => window.__pad.set(0, true));
-  await hidden.page.waitForFunction(() => window.__game.state === 'play');
-  await hidden.page.evaluate(() => window.__pad.set(0, false));
-  await shotWhenPromptVisible(hidden.page, 'buttons-hidden.png');
-  await hidden.page.evaluate(() => {
-    const target = document.querySelector('#game canvas');
-    const touch = new Touch({ identifier: 1, target, clientX: 400, clientY: 300, pageX: 400, pageY: 300 });
-    target.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [touch], changedTouches: [touch] }));
-    target.dispatchEvent(new TouchEvent('touchend', { bubbles: true, cancelable: true, touches: [], changedTouches: [touch] }));
-  });
-  await hidden.page.waitForFunction(() => !window.__game.buttonsHidden);
+  const hidden = await openGame(browser, { touch: true, pad: false });
+  await expect.poll(() => hidden.page.evaluate(() => window.__game.buttonsHidden)).toBe(false);
+  await expect(hidden.page.locator('#game [data-k="jump"]')).toBeVisible();
   await expect(hidden.page.locator('#hide-buttons')).toHaveText('Hide buttons');
   await hidden.page.locator('#hide-buttons').click();
   await hidden.page.waitForFunction(() => window.__game.buttonsHidden);
-  await hidden.page.evaluate(() => {
-    const target = document.querySelector('#game canvas');
-    const touch = new Touch({ identifier: 2, target, clientX: 420, clientY: 280, pageX: 420, pageY: 280 });
-    target.dispatchEvent(new TouchEvent('touchstart', { bubbles: true, cancelable: true, touches: [touch], changedTouches: [touch] }));
-  });
-  await hidden.page.waitForTimeout(200);
-  expect(await hidden.page.evaluate(() => window.__game.buttonsHidden)).toBe(true);
+  await expect(hidden.page.locator('#hide-buttons')).toHaveText('Show buttons');
+  await hidden.page.locator('#hide-buttons').click();
+  await hidden.page.waitForFunction(() => !window.__game.buttonsHidden);
   expect(hidden.errors).toEqual([]);
   await hidden.context.close();
 });
@@ -350,6 +346,43 @@ test('native=1 ignores getGamepads and plays from the injected controller', asyn
   expect(await page.evaluate(() => window.__game.paused)).toBe(true);
   await page.evaluate(() => window.__game.forcePause());
   expect(await page.evaluate(() => window.__game.paused)).toBe(true);
+
+  expect(errors).toEqual([]);
+  await context.close();
+});
+
+test('AnitaApp hides the chip and Start pauses without touch buttons', async ({ browser }) => {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 }, baseURL: 'http://127.0.0.1:4173' });
+  await context.addInitScript(() => { window.AnitaApp = { quit() {} }; });
+  const page = await context.newPage();
+  const errors = trackErrors(page);
+  await page.goto('/index.html?native=1');
+  await page.waitForFunction(() => window.__game && window.__game.state === 'title');
+  await expect(page.locator('#hide-buttons')).toBeHidden();
+
+  await page.evaluate(() => {
+    const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+    buttons[9] = { pressed: true, value: 1 };
+    window.__nativeButtons = buttons;
+  });
+  await page.waitForFunction(() => window.__game.state === 'play');
+  await page.evaluate(() => { window.__nativeButtons[9] = { pressed: false, value: 0 }; });
+  await page.waitForTimeout(80);
+
+  await page.evaluate(() => { window.__nativeButtons[9] = { pressed: true, value: 1 }; });
+  await page.waitForFunction(() => window.__game.paused);
+  await page.evaluate(() => { window.__nativeButtons[9] = { pressed: false, value: 0 }; });
+  expect(await page.evaluate(() => window.__game.pauseRow)).toBe(0);
+  expect(await page.evaluate(() => window.__game.pauseLabels())).toEqual(['Resume', 'Restart', 'Back to game menu', 'Quit app']);
+  await expect(page.locator('#hide-buttons')).toBeHidden();
+  await expect(page.locator('#game [data-k="jump"]')).toBeHidden();
+
+  await page.evaluate(() => { window.__nativeButtons[8] = { pressed: true, value: 1 }; });
+  await page.waitForTimeout(200);
+  await page.evaluate(() => { window.__nativeButtons[8] = { pressed: false, value: 0 }; });
+  expect(await page.evaluate(() => window.__game.paused)).toBe(true);
+  expect(await page.evaluate(() => window.__game.buttonsHidden)).toBe(true);
+  await expect(page.locator('#hide-buttons')).toBeHidden();
 
   expect(errors).toEqual([]);
   await context.close();
