@@ -229,7 +229,7 @@ function gfxTier() {
 function gfxProfile() {
   const tier = gfxTier();
   if (tier === "low") return { shadow: 0, grass: 0, pixel: 0.6, fireflies: 0.4 };
-  if (tier === "high") return { shadow: 256, grass: 180, pixel: 1, fireflies: 1 };
+  if (tier === "high") return { shadow: 256, grass: 1400, pixel: 1, fireflies: 1 };
   return { shadow: 0, grass: 0, pixel: 0.55, fireflies: 0.75 };
 }
 function lambert(color, extra) {
@@ -386,7 +386,7 @@ const ROCKS = [
 function pathX(z) { return Math.sin(z * 0.045) * 7; }
 function pathDist(x, z) { return Math.abs(x - pathX(z)); }
 function groundY(x, z) {
-  const roll = Math.sin(x * 0.07) * 0.55 + Math.cos(z * 0.05) * 0.4 + Math.sin((x + z) * 0.03) * 0.25;
+  const roll = Math.sin(x * 0.07) * 1.7 + Math.cos(z * 0.05) * 1.25 + Math.sin((x + z) * 0.03) * 0.7;
   const d = pathDist(x, z);
   const path = Math.max(0, 1 - d / 3.4);
   return roll * (1 - path * 0.85);
@@ -771,6 +771,7 @@ const bushMesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 10, 8), lam
   scene.add(bushMesh);
 }
 const rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.7, 0), lambert(0x8a847c), ROCKS.length);
+rockMesh.name = "rock-standins";
 {
   const d = new THREE.Object3D();
   ROCKS.forEach((r, i) => {
@@ -782,7 +783,7 @@ const rockMesh = new THREE.InstancedMesh(new THREE.DodecahedronGeometry(0.7, 0),
   });
   scene.add(rockMesh);
 }
-const GRASS_MAX = 180;
+const GRASS_MAX = 1400;
 const grassMat = lambert(0x2f8a3c, { roughness: 0.92, side: THREE.DoubleSide });
 const grassMesh = new THREE.InstancedMesh(new THREE.PlaneGeometry(0.045, 0.22), grassMat, GRASS_MAX);
 {
@@ -2593,7 +2594,17 @@ function instanceGltf(gltf, spots, scaleMul) {
     const geo = src.geometry.clone();
     geo.applyMatrix4(src.matrixWorld);
     const mat = src.material;
-    if (mat) mat.side = THREE.DoubleSide;
+    if (mat) {
+      mat.side = THREE.DoubleSide;
+      const label = (mat.name || "") + " " + (src.name || "");
+      if (/leaf/i.test(label)) {
+        mat.color.set(0x2f6a30);
+        mat.alphaTest = 0.35;
+        mat.transparent = false;
+      } else if (mat.color) {
+        mat.color.set(0x6b4a32);
+      }
+    }
     const inst = new THREE.InstancedMesh(geo, mat, spots.length);
     const d = new THREE.Object3D();
     spots.forEach((p, i) => {
@@ -2622,6 +2633,7 @@ function loadForestModels() {
   });
   load("models/tree_pine.glb", (g) => {
     instanceGltf(g, pines, 1.8);
+    instanceGltf(g, far, 1.6);
     const old = scene.getObjectByName("pine-canopy");
     if (old) old.visible = false;
     const trunksOld = scene.getObjectByName("pine-trunks");
@@ -2635,7 +2647,58 @@ function loadForestModels() {
     if (trunksOld) trunksOld.visible = false;
   });
   load("models/tree_broad.glb", (g) => instanceGltf(g, oaks.filter((_, i) => i % 2 === 0), 1.5));
-  load("models/rock.glb", (g) => instanceGltf(g, ROCKS.map((r) => ({ x: r.x, z: r.z, s: 1.6 })), 1));
+  load("models/rock.glb", (g) => {
+    instanceGltf(g, ROCKS.map((r) => ({ x: r.x, z: r.z, s: 2.2 })), 1);
+    const old = scene.getObjectByName("rock-standins");
+    if (old) old.visible = false;
+  });
+  const cards = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(2.4, 1.6),
+    new THREE.MeshLambertMaterial({ color: 0x2d6a32, side: THREE.DoubleSide }),
+    (pines.length + oaks.length + 80) * 3
+  );
+  const far = [];
+  for (let i = 0; i < 80; i++) {
+    const ang = (i / 80) * Math.PI * 2;
+    const rad = 34 + (i % 4) * 4;
+    const x = Math.cos(ang) * rad;
+    const z = 42 + Math.sin(ang) * rad * 0.85;
+    if (pathDist(x, z) < 6) continue;
+    far.push({ x, z, s: 1.3 + (i % 3) * 0.25 });
+  }
+  function crown(spots, height) {
+    const d = new THREE.Object3D();
+    spots.forEach((p, i) => {
+      const y = groundY(p.x, p.z) + height * (p.s || 1);
+      for (let k = 0; k < 3; k++) {
+        d.position.set(p.x + (k - 1) * 0.3, y, p.z);
+        d.rotation.set(0.15, i * 0.7 + k * 1.05, 0);
+        d.scale.setScalar(1.1 * (p.s || 1));
+        d.updateMatrix();
+        cards.setMatrixAt(cards.count, d.matrix);
+        cards.count += 1;
+      }
+    });
+  }
+  cards.count = 0;
+  crown(pines, 7.2);
+  crown(oaks, 5.4);
+  crown(far, 8);
+  cards.instanceMatrix.needsUpdate = true;
+  scene.add(cards);
+  const logGeo = new THREE.CylinderGeometry(0.16, 0.2, 1.8, 6);
+  logGeo.rotateZ(Math.PI / 2);
+  const logMesh = new THREE.InstancedMesh(logGeo, lambert(0x5c4030), 6);
+  const logSpots = [{ x: 5.2, z: 24 }, { x: -6.4, z: 41 }, { x: 7.1, z: 63 }, { x: -4.8, z: 78 }, { x: 9, z: 52 }, { x: -8.2, z: 18 }];
+  const ld = new THREE.Object3D();
+  logSpots.forEach((p, i) => {
+    ld.position.set(p.x, groundY(p.x, p.z) + 0.18, p.z);
+    ld.rotation.y = i * 0.8;
+    ld.updateMatrix();
+    logMesh.setMatrixAt(i, ld.matrix);
+  });
+  logMesh.instanceMatrix.needsUpdate = true;
+  scene.add(logMesh);
 }
 loadForestModels();
 window.addEventListener("error", (e) => {
