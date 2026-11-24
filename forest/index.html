@@ -860,16 +860,43 @@ for (let z = 10; z <= 96; z += 12) {
   posts.push(lamp);
 }
 
+function softDisc(inner, outer) {
+  const c = document.createElement("canvas");
+  c.width = 64; c.height = 64;
+  const g = c.getContext("2d");
+  const grd = g.createRadialGradient(32, 34, 2, 32, 34, 30);
+  grd.addColorStop(0, inner);
+  grd.addColorStop(1, outer);
+  g.fillStyle = grd;
+  g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+const flameMap = softDisc("rgba(255,250,220,1)", "rgba(255,70,0,0)");
+const haloMap = softDisc("rgba(255,186,70,0.7)", "rgba(255,120,20,0)");
 const lanterns = LANTERN_SPOTS.map((s) => {
   const g = new THREE.Group();
-  const body = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 10), new THREE.MeshLambertMaterial({ color: 0xffe08a, emissive: 0xff9a20, emissiveIntensity: 0.8 }));
-  const cap = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.12, 6), lambert(0x3a3228));
-  cap.position.y = 0.22;
-  const halo = new THREE.Mesh(new THREE.SphereGeometry(0.5, 8, 6), new THREE.MeshBasicMaterial({ color: 0xffcc77, transparent: true, opacity: 0.16, depthWrite: false }));
-  g.add(body, cap, halo);
-  g.position.set(s.x, groundY(s.x, s.z) + 1.3, s.z);
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.32, 0.14), lambert(0x2c261f));
+  stand.name = "standin";
+  stand.position.y = 0.16;
+  const flame = new THREE.Sprite(new THREE.SpriteMaterial({ map: flameMap, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+  flame.name = "flame";
+  flame.position.y = 0.2;
+  flame.scale.set(0.2, 0.28, 1);
+  const halo = new THREE.Sprite(new THREE.SpriteMaterial({ map: haloMap, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, opacity: 0.55 }));
+  halo.position.y = 0.2;
+  halo.scale.set(1.05, 1.05, 1);
+  g.add(stand, flame, halo);
+  const y = groundY(s.x, s.z) + 1.05;
+  g.position.set(s.x, y, s.z);
   scene.add(g);
-  return { x: s.x, z: s.z, got: false, mesh: g, mat: body.material, halo: halo.material, baseY: g.position.y };
+  return { x: s.x, z: s.z, got: false, held: false, mesh: g, flame, halo, baseY: y };
+});
+const lanternLights = [0, 1, 2].map(() => {
+  const light = new THREE.PointLight(0xffa24a, 0, 8, 2);
+  scene.add(light);
+  return light;
 });
 
 const gate = new THREE.Group();
@@ -1459,9 +1486,20 @@ function applySky() {
     lamp.material.emissiveIntensity = (k > 0.45 && i < collected) ? 1.4 : 0.05;
   });
   lanterns.forEach((l) => {
-    if (l.got) return;
-    l.mat.emissiveIntensity = (0.35 + k * 1.6) * (0.82 + 0.18 * Math.sin(performance.now() / 90 + l.x));
-    l.halo.opacity = 0.08 + k * 0.28;
+    if (l.got || l.held) return;
+    const flick = 0.86 + Math.sin(performance.now() / 62 + l.x) * 0.1 + Math.sin(performance.now() / 27 + l.z) * 0.06;
+    l.flame.scale.set(0.16 * flick, 0.3 * flick, 1);
+    l.halo.material.opacity = (0.28 + k * 0.55) * flick;
+  });
+  const ranked = lanterns.filter((l) => !l.got).map((l) => ({ l, d: Math.hypot(l.mesh.position.x - player.x, l.mesh.position.z - player.z) }));
+  ranked.sort((a, b) => a.d - b.d);
+  const budget = gfxTier() === "low" ? 1 : 3;
+  lanternLights.forEach((light, i) => {
+    const item = i < budget ? ranked[i] : null;
+    if (!item || item.d > 16) { light.intensity = 0; return; }
+    const flick = 0.84 + Math.sin(performance.now() / 55 + item.l.x) * 0.12;
+    light.position.set(item.l.mesh.position.x, item.l.mesh.position.y + 0.2, item.l.mesh.position.z);
+    light.intensity = (0.55 + k * 2.1) * flick;
   });
   if (wind && AC) wind.gain.value = muted ? 0 : lerp(0.012, 0.03, k);
   return hostile;
@@ -1496,8 +1534,7 @@ function poseHero(dt, moving, hostile) {
     setExpression(expr);
     const scaredNow = expr === "scared" || expr === "terrified";
     let clip = "idle";
-    if (lassoT > 0) clip = "lasso";
-    else if (player.hop > 0.05) clip = "jump";
+    if (player.hop > 0.05) clip = "jump";
     else if (hiding) clip = "crouch";
     else if (scaredNow && moving) clip = "scared_run";
     else if (scaredNow) clip = "scared_idle";
@@ -1505,6 +1542,8 @@ function poseHero(dt, moving, hostile) {
     else if (moving) clip = "walk";
     playClip(hero.userData.clips, clip);
     hero.userData.mixer.update(dt);
+    driveLassoArm();
+    placeCoil();
     const swayT = performance.now() / 1000;
     hero.traverse((obj) => {
       if (!obj.isBone || obj.name.indexOf("cape.") !== 0) return;
@@ -1660,6 +1699,8 @@ function startGame() {
   vel.z = 0;
   lassoT = 0;
   lassoCd = 0;
+  LASSO.phase = "idle";
+  LASSO.target = null;
   stunT = 0;
   stunUsed = false;
   pulls.length = 0;
@@ -1819,68 +1860,471 @@ function updateCamera(dt, moving) {
   cameraYaw = camYaw;
   cameraPitch = camPitch;
 }
-function tryLasso() {
-  if (state !== "play" || lassoCd > 0 || lassoT > 0) return;
-  lassoT = 0.55;
-  lassoCd = 0.85;
-  tone(660, 0.1, "triangle", 0.07, 990);
-  noiseBurst(0.12, 0.06, 400);
+function ropeCanvas() {
+  const c = document.createElement("canvas");
+  c.width = 64; c.height = 16;
+  const g = c.getContext("2d");
+  g.fillStyle = "#d3922a";
+  g.fillRect(0, 0, 64, 16);
+  for (let i = -2; i < 10; i++) {
+    g.strokeStyle = i % 2 ? "#fff1bf" : "#8a5410";
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(i * 8, 16);
+    g.lineTo(i * 8 + 14, 0);
+    g.stroke();
+  }
+  const tex = new THREE.CanvasTexture(c);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.repeat.set(7, 1);
+  return tex;
+}
+const ropeTex = ropeCanvas();
+const ropeMat = new THREE.MeshStandardMaterial({
+  map: ropeTex,
+  color: 0xffe29a,
+  emissive: 0xffb028,
+  emissiveMap: ropeTex,
+  emissiveIntensity: 1.8,
+  roughness: 0.4,
+  metalness: 0.62,
+});
+const ROPE_N = 20;
+const ROPE_SEG = 18;
+const ROPE_RAD = 6;
+const ropePts = Array.from({ length: ROPE_N }, () => ({ x: 0, y: 1, z: 0, px: 0, py: 1, pz: 0 }));
+const ropePos = new Float32Array((ROPE_SEG + 1) * ROPE_RAD * 3);
+const ropeNrm = new Float32Array(ropePos.length);
+const ropeUv = new Float32Array((ROPE_SEG + 1) * ROPE_RAD * 2);
+const ropeIx = [];
+for (let i = 0; i < ROPE_SEG; i++) {
+  for (let j = 0; j < ROPE_RAD; j++) {
+    const a = i * ROPE_RAD + j;
+    const b = i * ROPE_RAD + (j + 1) % ROPE_RAD;
+    const c = (i + 1) * ROPE_RAD + j;
+    const d = (i + 1) * ROPE_RAD + (j + 1) % ROPE_RAD;
+    ropeIx.push(a, c, b, b, c, d);
+  }
+}
+const ropeGeo = new THREE.BufferGeometry();
+ropeGeo.setAttribute("position", new THREE.BufferAttribute(ropePos, 3));
+ropeGeo.setAttribute("normal", new THREE.BufferAttribute(ropeNrm, 3));
+ropeGeo.setAttribute("uv", new THREE.BufferAttribute(ropeUv, 2));
+ropeGeo.setIndex(ropeIx);
+const ropeMesh = new THREE.Mesh(ropeGeo, ropeMat);
+ropeMesh.frustumCulled = false;
+ropeMesh.visible = false;
+scene.add(ropeMesh);
+const loopMesh = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.016, 6, 16), ropeMat);
+loopMesh.frustumCulled = false;
+loopMesh.visible = false;
+scene.add(loopMesh);
+const ropeLight = new THREE.PointLight(0xffc14a, 0, 5.5, 2);
+scene.add(ropeLight);
+const ropeCurvePts = Array.from({ length: ROPE_N }, () => new THREE.Vector3());
+const ropeCurve = new THREE.CatmullRomCurve3(ropeCurvePts);
+const SPARK_N = 48;
+const sparkPos = new Float32Array(SPARK_N * 3);
+const sparkCol = new Float32Array(SPARK_N * 3);
+const sparkGeo = new THREE.BufferGeometry();
+sparkGeo.setAttribute("position", new THREE.BufferAttribute(sparkPos, 3));
+sparkGeo.setAttribute("color", new THREE.BufferAttribute(sparkCol, 3));
+const sparkMesh = new THREE.Points(sparkGeo, new THREE.PointsMaterial({ size: 0.07, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+sparkMesh.frustumCulled = false;
+scene.add(sparkMesh);
+const sparks = Array.from({ length: SPARK_N }, () => ({ life: 0, x: 0, y: 0, z: 0, vx: 0, vy: 0, vz: 0 }));
+let sparkI = 0;
+const LASSO = { phase: "idle", t: 0, dur: 0.95, target: null };
+const _hand = new THREE.Vector3();
+const _tip = new THREE.Vector3();
+const _aim = new THREE.Vector3();
+const _spinEnd = new THREE.Vector3();
+const _pullFrom = new THREE.Vector3();
+const _armTarget = new THREE.Vector3();
+const _boneDir = new THREE.Vector3();
+const _localTarget = new THREE.Vector3();
+const _tubePoint = new THREE.Vector3();
+const _zAxis = new THREE.Vector3(0, 0, 1);
+let camHold = null;
+
+function placeCoil() {
+  const coil = hero.userData.coil;
+  const hip = hero.getObjectByName("pelvis");
+  if (!coil || !hip || coil.parent !== hero) return;
+  hero.updateWorldMatrix(true, true);
+  hip.getWorldPosition(_hand);
+  _armTarget.set(0.46, 0.04, 0.16).applyQuaternion(hero.quaternion);
+  _hand.add(_armTarget);
+  hero.worldToLocal(_hand);
+  coil.position.copy(_hand);
+}
+function makeCoil() {
+  const pts = [];
+  const n = 42;
+  for (let i = 0; i <= n; i++) {
+    const a = (i / n) * Math.PI * 2 * 4.2;
+    pts.push(new THREE.Vector3(Math.cos(a) * 0.055, (i / n - 0.5) * 0.1, Math.sin(a) * 0.055));
+  }
+  const mesh = new THREE.Mesh(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts), 56, 0.011, 5, false), ropeMat);
+  mesh.name = "lassoCoil";
+  return mesh;
+}
+function handPoint(out) {
+  const hand = hero.getObjectByName("hand_r");
+  if (hand) {
+    hero.updateWorldMatrix(true, true);
+    hand.getWorldPosition(out);
+    return out;
+  }
+  const yaw = hero.rotation.y;
+  out.set(hero.position.x + Math.sin(yaw) * 0.34, hero.position.y + 1.2, hero.position.z + Math.cos(yaw) * 0.34);
+  return out;
+}
+function pointBoneY(bone, targetWorld) {
+  const parent = bone.parent;
+  if (!parent) return;
+  parent.updateWorldMatrix(true, false);
+  _localTarget.copy(targetWorld);
+  parent.worldToLocal(_localTarget);
+  _boneDir.copy(_localTarget).sub(bone.position);
+  if (_boneDir.lengthSq() < 1e-6) return;
+  _boneDir.normalize();
+  bone.quaternion.setFromUnitVectors(_yUp, _boneDir);
+  bone.updateWorldMatrix(true, false);
+}
+const _yUp = new THREE.Vector3(0, 1, 0);
+function driveLassoArm() {
+  const action = hero.userData.lassoArm;
+  const active = LASSO.phase !== "idle";
+  if (action) {
+    if (active && !action.isRunning()) action.reset().setEffectiveWeight(1).fadeIn(0.08).play();
+    if (!active && action.isRunning()) action.fadeOut(0.15);
+  }
+  if (!active || LASSO.phase === "reel") return;
+  const upper = hero.getObjectByName("upperarm_r");
+  const lower = hero.getObjectByName("lowerarm_r");
+  if (!upper || !lower) return;
+  const u = LASSO.dur > 0 ? LASSO.t / LASSO.dur : 1;
+  const yaw = hero.rotation.y;
+  const hx = hero.position.x, hy = hero.position.y, hz = hero.position.z;
+  if (LASSO.phase === "spin") {
+    const ang = u * 2.6 * Math.PI * 2;
+    _armTarget.set(hx + Math.cos(ang) * 0.22, hy + 1.78, hz + Math.sin(ang) * 0.22);
+  } else if (LASSO.phase === "throw") {
+    _armTarget.set(
+      hx + (_aim.x - hx) * (0.2 + u * 0.45),
+      hy + 1.7 - u * 0.75,
+      hz + (_aim.z - hz) * (0.2 + u * 0.45)
+    );
+  } else if (LASSO.target) {
+    _armTarget.set(LASSO.target.mesh.position.x, hy + 1.25, LASSO.target.mesh.position.z);
+  } else {
+    _armTarget.set(hx + Math.sin(yaw) * 0.7, hy + 1.2, hz + Math.cos(yaw) * 0.7);
+  }
+  pointBoneY(upper, _armTarget);
+  pointBoneY(lower, _armTarget);
+}
+function chooseLantern() {
   const fx = Math.sin(heroYaw), fz = Math.cos(heroYaw);
+  let best = null, bestD = 7.2;
   for (const l of lanterns) {
-    if (l.got || pulls.some((p) => p.lantern === l)) continue;
+    if (l.got || l.held) continue;
     const dx = l.x - player.x, dz = l.z - player.z;
     const d = Math.hypot(dx, dz);
-    if (d > 6 || d < 0.15) continue;
-    if ((dx * fx + dz * fz) / d < 0.4) continue;
-    pulls.push({ lantern: l, t: 0, x: l.x, z: l.z, y: l.mesh.position.y });
+    if (d > 7 || d < 0.2) continue;
+    if ((dx * fx + dz * fz) / d < 0.35) continue;
+    if (d < bestD) { best = l; bestD = d; }
   }
-  if (nightFactor > 0.55 && !stunUsed) {
-    const dx = mon.x - player.x, dz = mon.z - player.z;
-    const d = Math.hypot(dx, dz) || 0.001;
-    if (d < 6.5 && (dx * fx + dz * fz) / d > 0.25) {
-      stunT = 2;
-      stunUsed = true;
-      hint("The lasso stunned him!");
-      tone(160, 0.35, "sawtooth", 0.07, 50);
+  return best;
+}
+function aimPoint(out) {
+  const l = LASSO.target;
+  if (l) return out.set(l.x, l.baseY + 0.15, l.z);
+  const fx = Math.sin(heroYaw), fz = Math.cos(heroYaw);
+  return out.set(player.x + fx * 5.2, groundY(player.x, player.z) + 1.2, player.z + fz * 5.2);
+}
+function spinTip(out) {
+  const u = LASSO.t / LASSO.dur;
+  const ang = u * 2.6 * Math.PI * 2;
+  out.set(
+    hero.position.x + Math.cos(ang) * 0.64,
+    hero.position.y + 2.08 + Math.sin(ang * 2) * 0.04,
+    hero.position.z + Math.sin(ang) * 0.64
+  );
+}
+function seedRope(hand) {
+  for (let i = 0; i < ROPE_N; i++) {
+    const p = ropePts[i];
+    p.x = p.px = hand.x;
+    p.y = p.py = hand.y + 0.04 * i;
+    p.z = p.pz = hand.z;
+  }
+}
+function emitSpark(x, y, z, spread) {
+  const s = sparks[sparkI];
+  sparkI = (sparkI + 1) % SPARK_N;
+  s.life = 1;
+  s.x = x; s.y = y; s.z = z;
+  s.vx = (Math.random() - 0.5) * spread;
+  s.vy = (Math.random() - 0.2) * spread;
+  s.vz = (Math.random() - 0.5) * spread;
+}
+function maybeStun() {
+  if (nightFactor <= 0.55 || stunUsed) return;
+  const fx = Math.sin(heroYaw), fz = Math.cos(heroYaw);
+  const dx = mon.x - player.x, dz = mon.z - player.z;
+  const d = Math.hypot(dx, dz) || 0.001;
+  if (d < 6.5 && (dx * fx + dz * fz) / d > 0.25) {
+    stunT = 2;
+    stunUsed = true;
+    hint("The lasso stunned him!");
+    tone(160, 0.35, "sawtooth", 0.07, 50);
+  }
+}
+function stepRope(dt, hand, tip, pinTip, gravity) {
+  const h = Math.min(0.033, Math.max(dt, 0.001));
+  for (let i = 0; i < ROPE_N; i++) {
+    const p = ropePts[i];
+    if (i === 0) {
+      p.px = p.x; p.py = p.y; p.pz = p.z;
+      p.x = hand.x; p.y = hand.y; p.z = hand.z;
+      continue;
+    }
+    const vx = (p.x - p.px) * 0.98;
+    const vy = (p.y - p.py) * 0.98;
+    const vz = (p.z - p.pz) * 0.98;
+    p.px = p.x; p.py = p.y; p.pz = p.z;
+    p.x += vx;
+    p.y += vy - gravity * h * h;
+    p.z += vz;
+  }
+  const span = Math.hypot(tip.x - hand.x, tip.y - hand.y, tip.z - hand.z);
+  let rest = Math.max(0.04, span / (ROPE_N - 1));
+  if (LASSO.phase === "miss") rest = 0.16;
+  else if (LASSO.phase === "reel") rest = 0.045;
+  else if (LASSO.phase === "catch" || LASSO.phase === "pull") rest *= 0.96;
+  else rest *= 1.01;
+  for (let iter = 0; iter < 10; iter++) {
+    const pin = ropePts[0];
+    pin.x = hand.x; pin.y = hand.y; pin.z = hand.z;
+    if (pinTip) {
+      const end = ropePts[ROPE_N - 1];
+      const k = LASSO.phase === "spin" ? 0.5 : 0.8;
+      end.x += (tip.x - end.x) * k;
+      end.y += (tip.y - end.y) * k;
+      end.z += (tip.z - end.z) * k;
+    }
+    for (let i = 0; i < ROPE_N - 1; i++) {
+      const a = ropePts[i], b = ropePts[i + 1];
+      let dx = b.x - a.x, dy = b.y - a.y, dz = b.z - a.z;
+      const dist = Math.hypot(dx, dy, dz) || 1e-4;
+      const diff = (dist - rest) / dist * 0.5;
+      dx *= diff; dy *= diff; dz *= diff;
+      if (i > 0) { a.x += dx; a.y += dy; a.z += dz; }
+      b.x -= dx; b.y -= dy; b.z -= dz;
     }
   }
 }
-function showRope(ax, ay, az, bx, by, bz) {
-  for (let i = 0; i < ropeBeads.length; i++) {
-    const t = (i + 1) / (ropeBeads.length + 1);
-    const bead = ropeBeads[i];
-    bead.visible = true;
-    bead.position.set(ax + (bx - ax) * t, ay + (by - ay) * t + Math.sin(t * Math.PI) * 0.55, az + (bz - az) * t);
+function drawRope() {
+  for (let i = 0; i < ROPE_N; i++) ropeCurvePts[i].set(ropePts[i].x, ropePts[i].y, ropePts[i].z);
+  ropeCurve.arcLengthDivisions = 40;
+  ropeCurve.updateArcLengths();
+  const frames = ropeCurve.computeFrenetFrames(ROPE_SEG, false);
+  let p = 0, uvi = 0;
+  const radius = 0.02;
+  for (let i = 0; i <= ROPE_SEG; i++) {
+    ropeCurve.getPointAt(i / ROPE_SEG, _tubePoint);
+    const N = frames.normals[i], B = frames.binormals[i];
+    for (let j = 0; j < ROPE_RAD; j++) {
+      const a = (j / ROPE_RAD) * Math.PI * 2 + i * 0.55;
+      const cx = Math.cos(a), sy = Math.sin(a);
+      const nx = cx * N.x + sy * B.x;
+      const ny = cx * N.y + sy * B.y;
+      const nz = cx * N.z + sy * B.z;
+      ropePos[p] = _tubePoint.x + radius * nx;
+      ropeNrm[p++] = nx;
+      ropePos[p] = _tubePoint.y + radius * ny;
+      ropeNrm[p++] = ny;
+      ropePos[p] = _tubePoint.z + radius * nz;
+      ropeNrm[p++] = nz;
+      ropeUv[uvi++] = (i / ROPE_SEG) * 7;
+      ropeUv[uvi++] = j / ROPE_RAD;
+    }
   }
+  ropeGeo.attributes.position.needsUpdate = true;
+  ropeGeo.attributes.normal.needsUpdate = true;
+  ropeGeo.attributes.uv.needsUpdate = true;
+  ropeGeo.computeBoundingSphere();
 }
-function updatePulls(dt, gy) {
-  for (let i = pulls.length - 1; i >= 0; i--) {
-    const p = pulls[i];
-    p.t += dt / 0.42;
-    const k = clamp(p.t, 0, 1);
-    const ease = k * k * (3 - 2 * k);
-    p.lantern.mesh.position.set(
-      p.x + (player.x - p.x) * ease,
-      p.y + (gy + 1.15 - p.y) * ease + Math.sin(k * Math.PI) * 1.35,
-      p.z + (player.z - p.z) * ease
+function drawLoop(tip, pinned) {
+  const last = ropePts[ROPE_N - 1];
+  const prev = ropePts[ROPE_N - 4];
+  loopMesh.position.set(pinned ? tip.x : last.x, pinned ? tip.y : last.y, pinned ? tip.z : last.z);
+  _boneDir.set(last.x - prev.x, last.y - prev.y, last.z - prev.z);
+  if (_boneDir.lengthSq() > 1e-4) {
+    _boneDir.normalize();
+    loopMesh.quaternion.setFromUnitVectors(_zAxis, _boneDir);
+  }
+  const tight = LASSO.phase === "catch" ? 1 - (LASSO.t / LASSO.dur) * 0.42 : (LASSO.phase === "pull" ? 0.58 : 1);
+  loopMesh.scale.setScalar(tight);
+}
+function stepSparks(dt, tip) {
+  if (LASSO.phase === "spin" || LASSO.phase === "throw") emitSpark(tip.x, tip.y, tip.z, 0.7);
+  for (let i = 0; i < SPARK_N; i++) {
+    const s = sparks[i];
+    if (s.life <= 0) {
+      sparkPos[i * 3 + 1] = -100;
+      continue;
+    }
+    s.life -= dt * 1.6;
+    s.x += s.vx * dt;
+    s.y += s.vy * dt;
+    s.z += s.vz * dt;
+    s.vy -= dt * 1.2;
+    sparkPos[i * 3] = s.x;
+    sparkPos[i * 3 + 1] = s.y;
+    sparkPos[i * 3 + 2] = s.z;
+    const c = Math.max(0, s.life);
+    sparkCol[i * 3] = 1;
+    sparkCol[i * 3 + 1] = 0.78 * c + 0.2;
+    sparkCol[i * 3 + 2] = 0.25 * c;
+  }
+  sparkGeo.attributes.position.needsUpdate = true;
+  sparkGeo.attributes.color.needsUpdate = true;
+}
+function tryLasso() {
+  if (state !== "play" || LASSO.phase !== "idle") return;
+  LASSO.phase = "spin";
+  LASSO.t = 0;
+  LASSO.dur = 0.95;
+  LASSO.target = null;
+  lassoT = 1;
+  tone(520, 0.09, "triangle", 0.05, 760);
+  seedRope(handPoint(_hand));
+}
+function updateLasso(dt) {
+  const coil = hero.userData.coil;
+  const old = hero.userData.lasso;
+  if (old) old.visible = LASSO.phase === "idle" && !coil;
+  if (LASSO.phase === "idle") {
+    ropeMesh.visible = false;
+    loopMesh.visible = false;
+    ropeLight.intensity = 0;
+    if (coil) coil.visible = true;
+    lassoT = 0;
+    stepSparks(dt, _tip);
+    return;
+  }
+  if (coil) coil.visible = false;
+  ropeMesh.visible = true;
+  loopMesh.visible = true;
+  lassoT = 1;
+  LASSO.t += dt;
+  const u = LASSO.dur > 0 ? LASSO.t / LASSO.dur : 1;
+  const hand = handPoint(_hand);
+  let pin = true;
+  let gravity = 6;
+  if (LASSO.phase === "spin") {
+    spinTip(_tip);
+    gravity = 2.2;
+    ropeLight.intensity = 1.5;
+    if (u >= 1) {
+      _spinEnd.copy(_tip);
+      LASSO.target = chooseLantern();
+      aimPoint(_aim);
+      LASSO.phase = "throw";
+      LASSO.t = 0;
+      LASSO.dur = 0.42;
+      tone(680, 0.1, "triangle", 0.07, 1040);
+      noiseBurst(0.1, 0.05, 420);
+    }
+  } else if (LASSO.phase === "throw") {
+    const e = clamp(u, 0, 1);
+    const ease = e * e * (3 - 2 * e);
+    _tip.lerpVectors(_spinEnd, _aim, ease);
+    _tip.y += Math.sin(e * Math.PI) * 1.2;
+    gravity = 4.5;
+    ropeLight.intensity = 2.3;
+    if (e >= 1) {
+      if (LASSO.target) {
+        LASSO.target.held = true;
+        _pullFrom.copy(LASSO.target.mesh.position);
+        LASSO.phase = "catch";
+        LASSO.t = 0;
+        LASSO.dur = 0.28;
+        for (let n = 0; n < 16; n++) emitSpark(_tip.x, _tip.y, _tip.z, 2.6);
+        tone(920, 0.09, "triangle", 0.08, 1400);
+      } else {
+        LASSO.phase = "miss";
+        LASSO.t = 0;
+        LASSO.dur = 0.36;
+        maybeStun();
+      }
+    }
+  } else if (LASSO.phase === "catch") {
+    const l = LASSO.target;
+    _tip.set(l.mesh.position.x, l.mesh.position.y + 0.12, l.mesh.position.z);
+    gravity = 3;
+    ropeLight.intensity = 2.8;
+    if (u >= 1) {
+      LASSO.phase = "pull";
+      LASSO.t = 0;
+      LASSO.dur = 0.48;
+      maybeStun();
+    }
+  } else if (LASSO.phase === "pull") {
+    const l = LASSO.target;
+    const e = clamp(u, 0, 1);
+    const ease = e * e * (3 - 2 * e);
+    l.mesh.position.set(
+      _pullFrom.x + (hand.x - _pullFrom.x) * ease,
+      _pullFrom.y + (hand.y - _pullFrom.y) * ease + Math.sin(e * Math.PI) * 0.7,
+      _pullFrom.z + (hand.z - _pullFrom.z) * ease
     );
-    if (k >= 1) {
-      p.lantern.got = true;
-      p.lantern.mesh.visible = false;
+    _tip.copy(l.mesh.position);
+    gravity = 4;
+    ropeLight.intensity = 1.6;
+    if (e >= 1) {
+      l.got = true;
+      l.held = false;
+      l.mesh.visible = false;
       lastLantern = { x: player.x, z: player.z };
       tone(660, 0.12, "triangle", 0.08, 1320);
-      hint("Lantern " + lanterns.filter((l) => l.got).length + " of 7");
-      pulls.splice(i, 1);
+      hint("Lantern " + lanterns.filter((item) => item.got).length + " of 7");
+      LASSO.target = null;
+      LASSO.phase = "reel";
+      LASSO.t = 0;
+      LASSO.dur = 0.3;
+    }
+  } else if (LASSO.phase === "miss") {
+    pin = false;
+    gravity = 20;
+    _tip.set(ropePts[ROPE_N - 1].x, ropePts[ROPE_N - 1].y, ropePts[ROPE_N - 1].z);
+    ropeLight.intensity = 0.45;
+    if (u >= 1) {
+      LASSO.phase = "reel";
+      LASSO.t = 0;
+      LASSO.dur = 0.34;
+    }
+  } else if (LASSO.phase === "reel") {
+    const e = clamp(u, 0, 1);
+    _tip.copy(hand);
+    _tip.y += 0.12;
+    gravity = 9;
+    ropeLight.intensity = 0.35 * (1 - e);
+    if (e >= 1) {
+      LASSO.phase = "idle";
+      lassoT = 0;
+      lassoCd = 0.2;
     }
   }
-  if (pulls.length) {
-    const p = pulls[0];
-    showRope(player.x, gy + 1.15, player.z, p.lantern.mesh.position.x, p.lantern.mesh.position.y, p.lantern.mesh.position.z);
-  } else if (lassoT > 0) {
-    const u = 1 - lassoT / 0.55;
-    const ang = heroYaw - 1.1 + u * 2.4;
-    showRope(player.x, gy + 1.1, player.z, player.x + Math.sin(ang) * 1.7, gy + 1.35, player.z + Math.cos(ang) * 1.7);
-  } else ropeBeads.forEach((b) => { b.visible = false; });
+  ropeLight.position.copy(loopMesh.position);
+  stepRope(dt, hand, _tip, pin, gravity);
+  drawRope();
+  drawLoop(_tip, pin && LASSO.phase !== "miss");
+  ropeLight.position.copy(loopMesh.position);
+  stepSparks(dt, _tip);
 }
 
 function showPanel(on) {
@@ -1897,7 +2341,7 @@ function refreshPanel() {
   if (state === "title") {
     heading.textContent = pausePage === "credits" ? "CREDITS" : "";
     blurb.textContent = pausePage === "credits"
-      ? "Characters and animations, trees, rocks, grass and logs by Quaternius (CC0). Ground, bark and rock textures by ambientCG (CC0)."
+      ? "Characters and animations, trees, rocks, grass and logs by Quaternius (CC0). Ground, bark and rock textures by ambientCG (CC0). The lantern cage is original."
       : "You are the Hero, lost in the woods. Collect 7 lanterns and reach the gate. The monster is friendly by day.";
     help.innerHTML = pausePage === "credits" ? "B goes back" : CONTROLS_HELP;
     prompt.textContent = controllerPrompt();
@@ -2044,7 +2488,6 @@ function updatePlay(dt) {
   if (pressed.act) interact();
   if (pressed.lasso) tryLasso();
   lassoCd = Math.max(0, lassoCd - dt);
-  if (lassoT > 0) lassoT = Math.max(0, lassoT - dt);
   if (!hostile) { stunUsed = false; stunT = 0; }
   else stunT = Math.max(0, stunT - dt);
   if (!inBush(player.x, player.z)) hiding = false;
@@ -2149,11 +2592,13 @@ function updatePlay(dt) {
     setTimeout(() => tone(784, 0.25, "triangle", 0.08), 240);
     showPanel(true); refreshPanel();
   }
-  updatePulls(dt, gy);
+  updateLasso(dt);
   lanterns.forEach((l) => {
-    if (l.got || pulls.some((p) => p.lantern === l)) return;
-    l.mesh.position.y = l.baseY + Math.sin(performance.now() / 380 + l.x) * 0.12;
-    l.mesh.rotation.y += dt;
+    if (l.got || l.held) return;
+    const sway = Math.sin(performance.now() / 700 + l.x);
+    l.mesh.position.y = l.baseY + sway * 0.05;
+    l.mesh.rotation.z = sway * 0.05;
+    l.mesh.rotation.x = Math.sin(performance.now() / 900 + l.z) * 0.035;
   });
   butterflies.forEach((b, i) => {
     b.position.x += Math.sin(performance.now() / 600 + i) * dt * 0.8;
@@ -2277,6 +2722,11 @@ function aimCamera(camX, camY, camZ, lookX, lookY, lookZ) {
 }
 
 function placeCamera(hostile, md) {
+  if (camHold) {
+    camera.position.set(camHold.px, camHold.py, camHold.pz);
+    camera.lookAt(camHold.tx, camHold.ty, camHold.tz);
+    return;
+  }
   const scaredNow = hostile && (md < 15 || mon.mode === "chase" || expression === "scared");
   const gy = groundY(player.x, player.z);
   if (fp && state === "play") {
@@ -2486,6 +2936,18 @@ window.__game = {
   set cameraPitch(v) { camPitch = v; cameraPitch = v; },
   get orbitYaw() { return camYaw - heroYaw; },
   get lassoT() { return lassoT; },
+  get lassoPhase() { return LASSO.phase; },
+  setCamera(px, py, pz, tx, ty, tz) { camHold = { px, py, pz, tx, ty, tz }; },
+  clearCamera() { camHold = null; },
+  get cameraHold() { return camHold; },
+  face(yaw) { heroYaw = yaw; hero.rotation.y = yaw; },
+  coilWorld() {
+    const coil = hero.userData.coil;
+    const v = new THREE.Vector3();
+    if (coil) coil.getWorldPosition(v);
+    else v.set(hero.position.x + 0.3, hero.position.y + 0.9, hero.position.z);
+    return { x: v.x, y: v.y, z: v.z };
+  },
   get stunT() { return stunT; },
   get stickMag() { return Math.hypot(stickTarget.x, stickTarget.y); },
   get padDebugOn() { return debugOn; },
@@ -2604,10 +3066,13 @@ function mountCharacter(root, gltf) {
     obj.receiveShadow = true;
     const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
     for (const m of mats) if (m) m.side = THREE.DoubleSide;
+    obj.frustumCulled = false;
     if (gfxTier() !== "high") {
-      obj.material = mats.filter(Boolean).map((m) => new THREE.MeshLambertMaterial({
-        map: m.map, color: m.color, skinning: true, side: THREE.DoubleSide,
+      const next = mats.filter(Boolean).map((m) => new THREE.MeshLambertMaterial({
+        map: m.map, color: m.color, side: THREE.DoubleSide,
       }));
+      if (next.length === 1) obj.material = next[0];
+      else if (next.length > 1) obj.material = next;
     }
   });
   const mixer = new THREE.AnimationMixer(model);
@@ -2618,9 +3083,29 @@ function mountCharacter(root, gltf) {
   }
   root.userData.mixer = mixer;
   root.userData.clips = { map, current: "" };
+  if (root === hero) {
+    const src = gltf.animations.find((clip) => clip.name === "lasso");
+    if (src) {
+      const tracks = src.tracks.filter((track) => /clavicle_r|upperarm_r|lowerarm_r|hand_r|spine_0/.test(track.name));
+      if (tracks.length) {
+        const armClip = new THREE.AnimationClip("lasso_arm", src.duration, tracks);
+        const action = mixer.clipAction(armClip);
+        action.setLoop(THREE.LoopOnce, 1);
+        action.clampWhenFinished = true;
+        root.userData.lassoArm = action;
+      }
+    }
+    const coil = makeCoil();
+    root.add(coil);
+    coil.scale.setScalar(1.7);
+    coil.rotation.set(0.5, 0.4, 1.1);
+    root.userData.coil = coil;
+    placeCoil();
+  }
   const lasso = root.getObjectByName("lasso");
   if (lasso) {
     root.userData.lasso = lasso;
+    if (root === hero) lasso.visible = false;
     const light = new THREE.PointLight(0xffc85a, 0.6, 5);
     light.name = "lassoLight";
     lasso.add(light);
@@ -2670,7 +3155,7 @@ function loadForestModels() {
     if (pathDist(x, z) < 2.2) continue;
     grassSpots.push({ x, z, s: 0.8 + (i % 4) * 0.15 });
   }
-  let left = 12;
+  let left = 13;
   const done = () => {
     left -= 1;
     if (left > 0) return;
@@ -2691,6 +3176,28 @@ function loadForestModels() {
   const hide = (name) => { const o = scene.getObjectByName(name); if (o) o.visible = false; };
   const characters = () => {
   load("models/hero.glb", (g) => mountCharacter(hero, g));
+  load("models/lantern.glb", (g) => {
+    g.scene.traverse((obj) => {
+      if (!obj.isMesh || !obj.material) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const m of mats) {
+        if (!m) continue;
+        m.side = THREE.DoubleSide;
+        if (m.transparent || (m.name && m.name.toLowerCase().indexOf("glass") >= 0)) {
+          m.transparent = true;
+          m.opacity = Math.min(m.opacity || 1, 0.42);
+          m.depthWrite = false;
+          m.emissive = m.emissive || new THREE.Color(0xffb050);
+          m.emissiveIntensity = Math.max(m.emissiveIntensity || 0, 0.35);
+        }
+      }
+    });
+    lanterns.forEach((l) => {
+      const stand = l.mesh.getObjectByName("standin");
+      if (stand) l.mesh.remove(stand);
+      l.mesh.add(g.scene.clone(true));
+    });
+  });
   load("models/monster.glb", (g) => {
     mountCharacter(monster, g);
     monster.traverse((obj) => {
