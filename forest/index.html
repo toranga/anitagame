@@ -2328,11 +2328,11 @@ function updateScare(dt) {
   scareHead.visible = false;
   bang.visible = false;
   poseMonster(dt, false, true);
-  const ahead = new THREE.Vector3(Math.sin(scareT * 60) * 0.02 * shiver, 0.15, -2.1);
+  const ahead = new THREE.Vector3(Math.sin(scareT * 60) * 0.02 * shiver, 0.05, -3.1);
   ahead.applyMatrix4(camera.matrixWorld);
-  monster.position.set(ahead.x, ahead.y - 1.72, ahead.z);
+  monster.position.set(ahead.x, ahead.y - 1.45, ahead.z);
   monster.rotation.y = Math.atan2(camera.position.x - monster.position.x, camera.position.z - monster.position.z);
-  monster.scale.setScalar(mild ? 1.0 : 1.15);
+  monster.scale.setScalar(mild ? 0.95 : 1.05);
   monster.traverse((obj) => {
     if (!obj.name) return;
     if (obj.name.indexOf("faceDay") === 0) obj.visible = false;
@@ -2462,6 +2462,7 @@ window.__game = {
   get gfxTier() { return gfxTier(); },
   get texturesReady() { return texturesReady; },
   get modelsReady() { return modelsReady; },
+  get modelsFailed() { return modelsFailed; },
   get resScale() { return resScale; },
   get expression() { return expression; },
   get jumpscareMode() { return jumpscareMode; },
@@ -2587,6 +2588,7 @@ requestAnimationFrame(() => {
 });
 setTimeout(bootTextures, 3500);
 let modelsReady = false;
+let modelsFailed = false;
 function mountCharacter(root, gltf) {
   while (root.children.length) root.remove(root.children[0]);
   const model = gltf.scene;
@@ -2664,18 +2666,35 @@ function loadForestModels() {
     grassSpots.push({ x, z, s: 0.8 + (i % 4) * 0.15 });
   }
   let left = 12;
-  const done = () => { left -= 1; if (left <= 0) modelsReady = true; };
-  const load = (url, ok) => loader.load(url, (g) => { ok(g); done(); }, undefined, done);
+  const done = () => {
+    left -= 1;
+    if (left > 0) return;
+    const cones = scene.getObjectByName("pine-canopy");
+    const oaks = scene.getObjectByName("oak-canopy");
+    if ((cones && cones.visible) || (oaks && oaks.visible)) {
+      modelsFailed = true;
+      console.error("Forest cones are still visible; the tree models did not replace them");
+    }
+    if (!modelsFailed) modelsReady = true;
+  };
+  const fail = (url) => (err) => {
+    modelsFailed = true;
+    console.error("Forest model failed to load: " + url + (err && err.message ? " (" + err.message + ")" : ""));
+    done();
+  };
+  const load = (url, ok) => loader.load(url, (g) => { ok(g); done(); }, undefined, fail(url));
   const hide = (name) => { const o = scene.getObjectByName(name); if (o) o.visible = false; };
   const characters = () => {
   load("models/hero.glb", (g) => mountCharacter(hero, g));
   load("models/monster.glb", (g) => {
     mountCharacter(monster, g);
     monster.traverse((obj) => {
-      if (obj.name && obj.name.indexOf("faceDay") === 0) obj.name = "eye" + obj.name.slice(7);
+      if (!obj.isMesh) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      mats.forEach((m) => { if (m) m.side = THREE.FrontSide; });
     });
     monster.userData.faces = {
-      day: monster.getObjectByName("eyeeyeL") || { visible: true },
+      day: monster.getObjectByName("faceDayeyeL") || { visible: true },
       night: monster.getObjectByName("faceNightmouth") || { visible: false },
     };
     monster.userData.hands = monster.userData.hands || { soft: [], claw: [] };
@@ -2709,7 +2728,7 @@ function loadForestModels() {
   load("models/bush.glb", (g) => { instanceGltf(g, BUSHES.map((b) => ({ x: b.x, z: b.z, s: 1 })), 1); hide("bush-standins"); });
   };
   characters();
-  setTimeout(trees, 45000);
+  trees();
 }
 loadForestModels();
 window.addEventListener("error", (e) => {

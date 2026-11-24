@@ -361,6 +361,111 @@ def add_cape(arm, chest):
     return obj
 
 
+def add_readable_eyes(arm, eyes):
+    xs = [v.co.x for v in eyes.data.vertices]
+    if not xs:
+        return
+    mid = (min(xs) + max(xs)) * 0.5
+    white = mat("heroEye", (0.95, 0.95, 0.93), 0.25)
+    ink = mat("heroPupil", (0.12, 0.08, 0.06), 0.3)
+    for sign, tag in ((1, "L"), (-1, "R")):
+        cluster = [v.co for v in eyes.data.vertices if (v.co.x - mid) * sign > 0]
+        if not cluster:
+            continue
+        center = sum(cluster, Vector()) / len(cluster)
+        center.y -= 0.012
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.03, location=center, segments=10, ring_count=8)
+        eye = bpy.context.active_object
+        eye.name = "heroEye" + tag
+        eye.data.materials.append(white)
+        stick(eye, arm, "Head")
+        bpy.ops.mesh.primitive_uv_sphere_add(radius=0.014, location=center + Vector((0, -0.02, 0)), segments=8, ring_count=6)
+        pupil = bpy.context.active_object
+        pupil.name = "heroPupil" + tag
+        pupil.data.materials.append(ink)
+        stick(pupil, arm, "Head")
+
+
+def push_face_forward(obj, scale, nudge):
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    if not bm.verts:
+        bm.free()
+        return
+    center = sum((v.co for v in bm.verts), Vector()) / len(bm.verts)
+    for v in bm.verts:
+        v.co.x = center.x + (v.co.x - center.x) * scale
+        v.co.z = center.z + (v.co.z - center.z) * scale
+        v.co.y -= nudge
+    bm.to_mesh(obj.data)
+    bm.free()
+    obj.data.update()
+
+
+def make_boot(arm, side, material, gold):
+    calf = arm.data.bones["calf_" + side]
+    foot = arm.data.bones["foot_" + side]
+    knee = calf.head_local
+    ankle = foot.head_local
+    toe = foot.tail_local
+    mesh = bpy.data.meshes.new("boot" + side)
+    obj = bpy.data.objects.new("boot" + side.upper(), mesh)
+    bpy.context.scene.collection.objects.link(obj)
+    bm = bmesh.new()
+    segs = 10
+
+    def ring(origin, radius, axis_y=0.0):
+        out = []
+        for i in range(segs):
+            a = i / segs * math.tau
+            out.append(bm.verts.new((
+                origin.x + math.cos(a) * radius,
+                origin.y + axis_y + math.sin(a) * radius * 0.85,
+                origin.z,
+            )))
+        return out
+
+    shaft = [
+        ring(knee, 0.075),
+        ring((knee + ankle) * 0.5, 0.068),
+        ring(ankle, 0.07),
+    ]
+    foot_rings = [
+        ring(ankle, 0.062),
+        ring((ankle + toe) * 0.5, 0.058, -0.01),
+        ring(Vector((toe.x, toe.y - 0.02, max(0.03, toe.z))), 0.045, -0.01),
+    ]
+    rings = shaft + foot_rings
+    for a, b in zip(rings, rings[1:]):
+        for i in range(segs):
+            j = (i + 1) % segs
+            bm.faces.new((a[i], a[j], b[j], b[i]))
+    bm.to_mesh(mesh)
+    bm.free()
+    mesh.materials.append(material)
+    calf_g = obj.vertex_groups.new(name="calf_" + side)
+    foot_g = obj.vertex_groups.new(name="foot_" + side)
+    for i, v in enumerate(mesh.vertices):
+        if v.co.z >= ankle.z - 0.01:
+            calf_g.add([i], 1.0, "REPLACE")
+        else:
+            foot_g.add([i], 1.0, "REPLACE")
+    mod = obj.modifiers.new("Armature", "ARMATURE")
+    mod.object = arm
+    obj.parent = arm
+    cuff_z = knee.z - 0.02
+    bpy.ops.mesh.primitive_torus_add(
+        major_radius=0.078, minor_radius=0.014,
+        location=(knee.x, knee.y, cuff_z), major_segments=14, minor_segments=6,
+    )
+    cuff = bpy.context.active_object
+    cuff.name = "bootgold" + side.upper()
+    cuff.rotation_euler.x = math.pi / 2
+    bpy.ops.object.transform_apply(rotation=True)
+    cuff.data.materials.append(gold)
+    stick(cuff, arm, "calf_" + side)
+
+
 def dress_hero(arm):
     bpy.context.view_layer.update()
     body = next(o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("Superhero"))
@@ -377,21 +482,20 @@ def dress_hero(arm):
     flared_skirt(arm, hips, knee.z, skirt_material(star_image()))
     for side, bone in (("L", "lowerarm_l"), ("R", "lowerarm_r")):
         bone_cylinder(arm, bone, gold, 0.048, "bracer" + side)
-    for side, bone in (("L", "calf_l"), ("R", "calf_r")):
-        boot = bone_cylinder(arm, bone, bootm, 0.055, "boot" + side)
-        top = bone_pos(arm, bone)
-        bpy.ops.mesh.primitive_torus_add(major_radius=0.06, minor_radius=0.012, location=(top.x, top.y, top.z), major_segments=12, minor_segments=6)
-        cuff = bpy.context.active_object
-        cuff.name = "bootgold" + side
-        cuff.rotation_euler.x = math.pi / 2
-        bpy.ops.object.transform_apply(rotation=True)
-        cuff.data.materials.append(gold)
-        stick(cuff, arm, bone)
+    for side in ("l", "r"):
+        make_boot(arm, side, bootm, gold)
+    eyes = next((o for o in bpy.data.objects if o.name == "Eyes"), None)
+    if eyes:
+        push_face_forward(eyes, 1.7, 0.025)
+        add_readable_eyes(arm, eyes)
+    brows = next((o for o in bpy.data.objects if o.name == "Eyebrows"), None)
+    if brows:
+        push_face_forward(brows, 1.35, 0.016)
     add_cape(arm, chest)
-    bpy.ops.mesh.primitive_torus_add(major_radius=0.1, minor_radius=0.016, location=(head.x, head.y - 0.01, head.z + 0.07), major_segments=18, minor_segments=6)
+    bpy.ops.mesh.primitive_torus_add(major_radius=0.12, minor_radius=0.018, location=(head.x, head.y - 0.02, head.z + 0.16), major_segments=18, minor_segments=6)
     tiara = bpy.context.active_object
     tiara.name = "tiara"
-    tiara.scale = (1.05, 0.72, 0.4)
+    tiara.scale = (1.15, 0.9, 0.55)
     bpy.ops.object.transform_apply(scale=True)
     tiara.data.materials.append(gold)
     stick(tiara, arm, "Head")
@@ -471,6 +575,79 @@ def paint(color):
             node.inputs["Base Color"].default_value = (*color, 1)
 
 
+def vert_weight(obj, index, name):
+    group = obj.vertex_groups.get(name)
+    if group is None:
+        return 0.0
+    try:
+        return group.weight(index)
+    except RuntimeError:
+        return 0.0
+
+
+def reshape_alien(mesh, arm):
+    """Keep the skinned alien mesh. Round the head onto the head bone and stretch the torso up to it."""
+    center = arm.data.bones["Head2"].head_local.copy() if "Head2" in arm.data.bones else arm.data.bones["Head"].head_local.copy()
+    kinds = []
+    for v in mesh.data.vertices:
+        head_w = vert_weight(mesh, v.index, "Head") + vert_weight(mesh, v.index, "Head2") + vert_weight(mesh, v.index, "Head3")
+        body_w = vert_weight(mesh, v.index, "Body") + vert_weight(mesh, v.index, "Mouth")
+        kinds.append("head" if head_w >= body_w else "body")
+    body_z = [v.co.z for v, k in zip(mesh.data.vertices, kinds) if k == "body"]
+    z0 = min(body_z) if body_z else 0.0
+    z1 = max(body_z) if body_z else 0.4
+    target_top = center.z - 0.3
+    for v, kind in zip(mesh.data.vertices, kinds):
+        if kind == "head":
+            d = v.co - center
+            dist = d.length
+            v.co = center + (d / dist * 0.34 if dist > 1e-5 else Vector((0.0, -0.34, 0.0)))
+        else:
+            t = (v.co.z - z0) / max(1e-4, z1 - z0)
+            v.co.x *= 0.7
+            v.co.y *= 0.7
+            v.co.z = z0 + t * max(0.2, target_top - z0)
+    mesh.data.update()
+    for attr in list(mesh.data.color_attributes):
+        mesh.data.color_attributes.remove(attr)
+    print("alien reshaped, head", tuple(round(c, 2) for c in center), "body", round(z0, 2), round(target_top, 2))
+    return center
+
+
+def pose_arms(arm, action, clip):
+    bpy.context.view_layer.objects.active = arm
+    if bpy.context.object.mode != "POSE":
+        bpy.ops.object.mode_set(mode="POSE")
+    for bone in arm.pose.bones:
+        if bone.name.startswith("arm_") or bone.name.startswith("forearm_"):
+            bone.rotation_mode = "XYZ"
+    bpy.ops.object.mode_set(mode="OBJECT")
+    start, end = action.frame_range
+    mid = (start + end) * 0.5
+
+    def key(bone, frame, rot):
+        path = 'pose.bones["%s"].rotation_euler' % bone
+        for index, value in enumerate(rot):
+            curve = action.fcurves.find(path, index=index)
+            if curve is None:
+                curve = action.fcurves.new(path, index=index)
+            curve.keyframe_points.insert(frame, value)
+
+    if clip == "wave":
+        key("arm_R", start, (0.2, 0.0, 0.2))
+        key("arm_R", mid, (-1.35, 0.0, 0.35))
+        key("arm_R", end, (0.2, 0.0, 0.2))
+        key("forearm_R", mid, (-0.6, 0.0, 0.0))
+        return
+    swing = 0.85 if clip in ("stalk", "chase", "lunge") else 0.25
+    key("arm_L", start, (swing, 0.0, -0.25))
+    key("arm_R", start, (-swing, 0.0, 0.25))
+    key("arm_L", mid, (-swing, 0.0, -0.25))
+    key("arm_R", mid, (swing, 0.0, 0.25))
+    key("arm_L", end, (swing, 0.0, -0.25))
+    key("arm_R", end, (-swing, 0.0, 0.25))
+
+
 def add_stick_limb(arm, parent_name, names, points, radius, material):
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.mode_set(mode="EDIT")
@@ -496,42 +673,35 @@ def build_monster():
     print("monster actions", sorted(a.name for a in bpy.data.actions))
     arm = next(o for o in new if o.type == "ARMATURE")
     roots = [o for o in new if o.parent is None]
-    fit_height(roots, 2.35)
+    fit_height(roots, 2.45)
     bpy.context.view_layer.update()
-    for obj in list(bpy.data.objects):
-        if obj.type == "MESH":
-            bpy.data.objects.remove(obj, do_unlink=True)
-    top = bone_pos(arm, "Head3") if "Head3" in arm.data.bones else bone_pos(arm, "Head")
+    alien = next(o for o in bpy.data.objects if o.type == "MESH")
+    center = reshape_alien(alien, arm)
+    for slot in alien.data.materials:
+        if not slot or not slot.use_nodes:
+            continue
+        node = slot.node_tree.nodes.get("Principled BSDF")
+        if not node:
+            continue
+        for link in list(slot.node_tree.links):
+            if link.to_node == node and link.to_socket == node.inputs["Base Color"]:
+                slot.node_tree.links.remove(link)
+        node.inputs["Base Color"].default_value = (0.82, 0.09, 0.1, 1)
     dark = mat("limb", (0.07, 0.045, 0.05), 0.55)
-    red = mat("torso", (0.82, 0.09, 0.1), 0.42)
-    torso_h = max(0.8, top.z - 0.7)
-    bpy.ops.mesh.primitive_cylinder_add(radius=0.2, depth=torso_h, location=(0, 0, 0.12 + torso_h * 0.5), vertices=12)
-    torso = bpy.context.active_object
-    torso.name = "torso"
-    torso.data.materials.append(red)
-    stick(torso, arm, "Body")
-    shoulder_z = 0.12 + torso_h - 0.05
-    hip_z = 0.28
+    shoulder_z = center.z - 0.28
     for sign, tag in ((1, "L"), (-1, "R")):
         add_stick_limb(
             arm, "Body",
             ["arm_%s" % tag, "forearm_%s" % tag],
-            [(sign * 0.24, -0.04, shoulder_z), (sign * 0.55, -0.08, shoulder_z - 0.85), (sign * 0.7, -0.1, 0.05)],
-            0.028, dark,
+            [
+                (sign * 0.28, center.y - 0.05, shoulder_z),
+                (sign * 0.62, center.y - 0.12, shoulder_z - 0.85),
+                (sign * 0.72, center.y - 0.16, 0.02),
+            ],
+            0.06, dark,
         )
-        add_stick_limb(
-            arm, "Body",
-            ["thigh_%s" % tag, "shin_%s" % tag],
-            [(sign * 0.1, 0.02, hip_z), (sign * 0.14, 0.04, hip_z - 0.55), (sign * 0.16, 0.05, 0.0)],
-            0.03, dark,
-        )
-    head_bone = "Head3" if "Head3" in arm.data.bones else "Head"
-    head = bone_pos(arm, head_bone)
-    bpy.ops.mesh.primitive_uv_sphere_add(radius=0.36, location=(head.x, head.y, head.z + 0.05), segments=18, ring_count=12)
-    ball = bpy.context.active_object
-    ball.name = "roundHead"
-    ball.data.materials.append(red)
-    stick(ball, arm, head_bone)
+    head_bone = "Head2" if "Head2" in arm.data.bones else "Head"
+    head = center
     white = mat("eyeWhite", (0.96, 0.96, 0.94), 0.25)
     ink = mat("pupil", (0.06, 0.02, 0.03), 0.3)
     glow = mat("glowEye", (1.0, 0.86, 0.35), 0.2, emit=4.0)
@@ -590,6 +760,7 @@ def build_monster():
             continue
         copy = action.copy()
         copy.name = clip
+        pose_arms(arm, copy, clip)
         add_nla(arm, copy, clip)
     export(os.path.join(OUT, "monster.glb"), [arm])
 

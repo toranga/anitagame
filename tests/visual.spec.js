@@ -24,7 +24,7 @@ async function boot(browser, gfx) {
   const page = await context.newPage();
   const errors = track(page);
   await page.goto('/forest/index.html');
-  await page.waitForFunction(() => window.__game && window.__game.state === 'title' && window.__game.texturesReady && window.__game.modelsReady, null, { timeout: 70000 });
+  await page.waitForFunction(() => window.__game && window.__game.state === 'title' && window.__game.texturesReady && window.__game.modelsReady && !window.__game.modelsFailed, null, { timeout: 25000 });
   return { context, page, errors };
 }
 
