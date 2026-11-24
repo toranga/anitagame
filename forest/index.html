@@ -95,6 +95,7 @@
 <script type="module">
 import * as THREE from "three";
 import { GLTFLoader } from "./vendor/GLTFLoader.js";
+import { MeshoptDecoder } from "./vendor/meshopt_decoder.module.js";
 
 const TITLE = "SPOOKY FOREST";
 document.title = TITLE;
@@ -1500,6 +1501,12 @@ function poseHero(dt, moving, hostile) {
     else if (moving) clip = "walk";
     playClip(hero.userData.clips, clip);
     hero.userData.mixer.update(dt);
+    const swayT = performance.now() / 1000;
+    hero.traverse((obj) => {
+      if (!obj.isBone || obj.name.indexOf("cape.") !== 0) return;
+      const band = Number(obj.name.slice(5)) || 1;
+      obj.rotation.x += Math.sin(swayT * 1.7 + band) * 0.08 * band;
+    });
     const ll = hero.getObjectByName("lassoLight");
     if (ll) ll.intensity = lassoT > 0 ? 3.2 : 0.25 + nightFactor * 2.1;
     hero.rotation.x = 0;
@@ -1715,6 +1722,7 @@ function endScare() {
   flash.style.opacity = "0";
   flash.style.background = "#ff1a1a";
   scareHead.visible = false;
+  monster.scale.setScalar(1);
   scareLight.intensity = 0;
   scareCamReady = false;
   if (scareKind === "surprise") {
@@ -2317,13 +2325,22 @@ function updateScare(dt) {
     scareBase.y + Math.cos(scareT * 64) * 0.035 * shiver,
     scareBase.z
   );
-  scareHead.visible = true;
+  scareHead.visible = false;
   bang.visible = false;
-  scareHead.position.set(Math.sin(scareT * 60) * 0.04 * shiver, -0.08, -dist);
-  scareHead.scale.setScalar(sc);
-  scareHead.rotation.set(-0.08, 0, Math.sin(scareT * 72) * 0.03 * shiver);
+  poseMonster(dt, false, true);
+  const ahead = new THREE.Vector3(Math.sin(scareT * 60) * 0.02 * shiver, 0.15, -2.1);
+  ahead.applyMatrix4(camera.matrixWorld);
+  monster.position.set(ahead.x, ahead.y - 1.72, ahead.z);
+  monster.rotation.y = Math.atan2(camera.position.x - monster.position.x, camera.position.z - monster.position.z);
+  monster.scale.setScalar(mild ? 1.0 : 1.15);
+  monster.traverse((obj) => {
+    if (!obj.name) return;
+    if (obj.name.indexOf("faceDay") === 0) obj.visible = false;
+    if (obj.name.indexOf("faceNight") === 0) obj.visible = true;
+  });
   camera.updateMatrixWorld(true);
-  scareHead.getWorldPosition(_camV);
+  monster.getWorldPosition(_camV);
+  _camV.y += 1.72;
   scareLight.intensity = mild ? 6 : 24;
   scareLight.position.set(_camV.x, _camV.y - 0.55 * sc, _camV.z);
   scareLight.position.lerp(camera.position, 0.2);
@@ -2628,6 +2645,7 @@ function instanceGltf(gltf, spots, scaleMul, allow) {
 }
 function loadForestModels() {
   const loader = new GLTFLoader();
+  loader.setMeshoptDecoder(MeshoptDecoder);
   const detailed = gfxTier() === "high";
   const far = [];
   for (let i = 0; i < 36; i++) {
