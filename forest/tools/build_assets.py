@@ -78,11 +78,17 @@ def decimate(obj, target):
     faces = len(obj.data.polygons)
     if faces <= target:
         return
-    mod = obj.modifiers.new("dec", "DECIMATE")
-    mod.ratio = target / faces
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
     bpy.context.view_layer.objects.active = obj
-    bpy.ops.object.modifier_apply(modifier="dec")
+    guard = 0
+    while len(obj.data.polygons) > target and guard < 6:
+        guard += 1
+        mod = obj.modifiers.new("dec", "DECIMATE")
+        mod.ratio = 0.5
+        bpy.ops.object.modifier_apply(modifier="dec")
     smooth(obj)
+    print("decimated", obj.name, faces, "->", len(obj.data.polygons))
 
 
 def new_armature(name, bones):
@@ -508,7 +514,7 @@ def build_trees():
             obj.data = obj.data.copy()
             faces = len(obj.data.polygons)
             use_leaf = obj.name.lower().startswith("leav")
-            limit = 1400 if use_leaf else 1800
+            limit = 900 if use_leaf else 700
             if faces > limit:
                 decimate(obj, limit)
             obj.data.materials.clear()

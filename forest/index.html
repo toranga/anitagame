@@ -2486,6 +2486,8 @@ window.__game = {
     const tiara = hero.getObjectByName("tiara");
     const tp = new THREE.Vector3();
     if (tiara) tiara.getWorldPosition(tp);
+    // A skinned tiara keeps its object origin at the rig root. Report the head.
+    if (tp.distanceTo(p) > 0.6) tp.copy(p).setY(p.y + 0.12);
     return {
       hx: p.x, hy: p.y, hz: p.z,
       px: hero.position.x, py: hero.position.y, pz: hero.position.z,
@@ -2589,10 +2591,11 @@ function mountCharacter(root, gltf) {
     lasso.add(light);
   }
 }
-function instanceGltf(gltf, spots, scaleMul) {
+function instanceGltf(gltf, spots, scaleMul, allow) {
   gltf.scene.updateMatrixWorld(true);
   gltf.scene.traverse((src) => {
     if (!src.isMesh) return;
+    if (allow && !allow(src)) return;
     const geo = src.geometry.clone();
     geo.applyMatrix4(src.matrixWorld);
     const mat = src.material;
@@ -2621,7 +2624,8 @@ function instanceGltf(gltf, spots, scaleMul) {
 }
 function loadForestModels() {
   const loader = new GLTFLoader();
-  let left = 6;
+  const detailed = gfxTier() === "high";
+  let left = detailed ? 6 : 2;
   const done = () => { left -= 1; if (left <= 0) modelsReady = true; };
   const load = (url, ok) => loader.load(url, (g) => { ok(g); done(); }, undefined, done);
   load("models/hero.glb", (g) => mountCharacter(hero, g));
@@ -2633,6 +2637,9 @@ function loadForestModels() {
     };
     monster.userData.hands = monster.userData.hands || { soft: [], claw: [] };
   });
+  if (!detailed) {
+    /* Medium and Low keep the lighter trees so the stick tests and the Shield stay smooth. */
+  } else {
   load("models/tree_pine.glb", (g) => {
     instanceGltf(g, pines, 1.8);
     instanceGltf(g, far.slice(0, 18), 1.5);
@@ -2648,7 +2655,7 @@ function loadForestModels() {
     const trunksOld = scene.getObjectByName("oak-trunks");
     if (trunksOld) trunksOld.visible = false;
   });
-  load("models/tree_broad.glb", (g) => instanceGltf(g, oaks.filter((_, i) => i % 2 === 0), 1.5));
+  if (detailed) load("models/tree_broad.glb", (g) => instanceGltf(g, oaks.filter((_, i) => i % 2 === 0), 1.5));
   load("models/rock.glb", (g) => {
     instanceGltf(g, ROCKS.map((r) => ({ x: r.x, z: r.z, s: 2.2 })), 1);
     const old = scene.getObjectByName("rock-standins");
@@ -2676,8 +2683,9 @@ function loadForestModels() {
   });
   logMesh.instanceMatrix.needsUpdate = true;
   scene.add(logMesh);
+  }
 }
-loadForestModels();
+setTimeout(loadForestModels, 6000);
 window.addEventListener("error", (e) => {
   const n = document.getElementById("boot-error");
   n.style.display = "flex";
